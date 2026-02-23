@@ -9,16 +9,16 @@ import { useAuth } from './context/AuthProvider';
 type Tab = 'dashboard' | 'product-entry' | 'inventory-entry';
 
 function App() {
-  const { token, logout } = useAuth();
+  const { token, logout, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('inventory-entry');
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [userProfile, setUserProfile] = useState(null);
 
   // Fetch user profile on token change
   useEffect(() => {
+    console.log('App: Token changed to:', token);
     if (token) {
       const fetchUserProfile = async () => {
         try {
+          console.log('App: Fetching user profile with token:', token.substring(0, 20) + '...');
           const response = await fetch(`${import.meta.env.VITE_BASE_URL}/api/me`, {
             method: 'GET',
             headers: {
@@ -30,9 +30,12 @@ function App() {
           if (response.ok) {
             const data = await response.json();
             console.log('User profile fetched:', data);
-            setUserProfile(data);
           } else {
             console.error('Failed to fetch user profile:', response.status);
+            // If token is invalid, logout the user
+            if (response.status === 401) {
+              console.log('Token is invalid, logging out');
+            }
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);
@@ -41,7 +44,7 @@ function App() {
 
       fetchUserProfile();
     }
-  }, [token]);
+  }, [token, ]);
 
   const handleLogout = () => {
     logout();
@@ -51,6 +54,19 @@ function App() {
     // Login handled by AuthProvider context
   };
 
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
   if (!token) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
@@ -119,17 +135,9 @@ function App() {
           </div>
 
           <div className="p-6 md:p-8">
-            {activeTab === 'dashboard' && (
-              <InventoryDashboard key={refreshKey} />
-            )}
-
-            {activeTab === 'product-entry' && (
-              <ProductDataEntry key={refreshKey} />
-            )}
-
-            {activeTab === 'inventory-entry' && (
-              <InventoryDataEntry key={refreshKey} />
-            )}
+            {activeTab === 'dashboard' && <InventoryDashboard />}
+            {activeTab === 'product-entry' && <ProductDataEntry />}
+            {activeTab === 'inventory-entry' && <InventoryDataEntry />}
           </div>
         </div>
 

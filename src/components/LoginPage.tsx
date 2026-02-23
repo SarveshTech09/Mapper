@@ -60,6 +60,7 @@ const LoginPage = ({ onLoginSuccess }: { onLoginSuccess?: () => void }) => {
       if (response.ok) {
         const data = await response.json();
         console.log('Login successful', data);
+        console.log('LoginPage: Token received:', data.access_token.substring(0, 20) + '...');
         // Handle successful login with context
         login(data.access_token, data.user);
         if (onLoginSuccess) {
