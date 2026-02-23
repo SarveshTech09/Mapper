@@ -14,7 +14,6 @@ import {
 
 interface ProductRow {
   id: string;
-  isNew: boolean;
   category: string;
   sub_category: string;
   status: "active" | "inactive";
@@ -24,53 +23,41 @@ const { Title, Text } = Typography;
 
 export default function ProductDataEntry() {
   const [rows, setRows] = useState<ProductRow[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [businessId, setBusinessId] = useState<number | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>();
   const [subCategoryFilter, setSubCategoryFilter] = useState<string>();
+
   const [categories, setCategories] = useState<
     { value: string; label: string }[]
   >([]);
 
-  useEffect(() => {
-    const initialize = async () => {
-      const token = localStorage.getItem("access_token");
+  const [subCategories, setSubCategories] = useState<
+    { value: string; label: string }[]
+  >([]);
 
-      if (!token) {
-        setError("User not authenticated");
-        setLoading(false);
-        return;
-      }
+  /* ================= LOAD INITIAL DATA ================= */
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
 
       try {
         setLoading(true);
-        setError(null);
 
-        /* ---------- STEP 1: Get Business ID ---------- */
-        const meResponse = await fetch(
-          `${import.meta.env.VITE_BASE_URL}/api/me`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        // 1️⃣ Get business ID
+        const meRes = await fetch(`${import.meta.env.VITE_BASE_URL}/api/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-        if (!meResponse.ok) {
-          throw new Error(`ME API Error: ${meResponse.status}`);
-        }
+        const meData = await meRes.json();
+        const id = meData.business_id;
+        setBusinessId(id);
 
-        const meData = await meResponse.json();
-        const businessId = meData.business_id;
-
-        if (!businessId) {
-          throw new Error("Business ID not found");
-        }
-
-        /* ---------- STEP 2: Fetch Categories ---------- */
-        const categoryResponse = await fetch(
+        // 2️⃣ Get Categories
+        const categoryRes = await fetch(
           `${import.meta.env.VITE_BASE_URL}/api/getCategory`,
           {
             method: "POST",
@@ -79,105 +66,105 @@ export default function ProductDataEntry() {
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
-              business_id: businessId,
+              business_id: id,
               sub_category_id: 0,
             }),
-          }
+          },
         );
 
-        if (!categoryResponse.ok) {
-          throw new Error(
-            `Category API Error: ${categoryResponse.status}`
-          );
-        }
-
-        const categoryData = await categoryResponse.json();
+        const categoryData = await categoryRes.json();
         const categoryArray = categoryData.data ?? [];
 
-        /* ---------- STEP 3: Format Rows ---------- */
-        const formattedData: ProductRow[] = categoryArray.map(
-          (item: any, index: number) => ({
+        setRows(
+          categoryArray.map((item: any, index: number) => ({
             id: index.toString(),
-            isNew: false,
-            category: item.category_type, // 🔥 FIXED
-            sub_category: "", // no sub category in response
-            status: "active", // default
-          })
+            category: item.category_type,
+            sub_category: item.product_category ?? "",
+            status: "active",
+          })),
         );
 
-        setRows(formattedData);
-
-        /* ---------- STEP 4: Build Category Select ---------- */
-        const categoryOptions = categoryArray.map((item: any) => ({
-          value: item.category_type,
-          label: item.category_type,
-        }));
-
-        setCategories(categoryOptions);
-      } catch (error: any) {
-        console.error("Category fetch error:", error);
-        setError(error.message || "Failed to load categories.");
+        setCategories(
+          categoryArray.map((item: any) => ({
+            value: item.category_type,
+            label: item.category_type,
+          })),
+        );
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load data.");
       } finally {
         setLoading(false);
       }
     };
 
-    initialize();
+    fetchInitialData();
   }, []);
 
-  const categoryOptions = useMemo(() => {
-    return [...new Set(rows.map((r) => r.category))].map((cat) => ({
-      value: cat,
-      label: cat,
-    }));
-  }, [rows]);
+  /* ================= LOAD SUB CATEGORIES ================= */
+  useEffect(() => {
+    const fetchSubCategories = async () => {
+      if (!categoryFilter || !businessId) {
+        return;
+      }
 
-  const subCategoryOptions = useMemo(() => {
-    const filtered = categoryFilter
-      ? rows.filter((r) => r.category === categoryFilter)
-      : rows;
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
 
-    return [...new Set(filtered.map((r) => r.sub_category))].map((sub) => ({
-      value: sub,
-      label: sub,
-    }));
-  }, [rows, categoryFilter]);
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_BASE_URL}/api/optical/getCategory/${businessId}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              category_type: categoryFilter,
+            }),
+          },
+        );
 
-  const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      const matchCategory = categoryFilter
-        ? row.category === categoryFilter
-        : true;
-      const matchSubCategory = subCategoryFilter
-        ? row.sub_category === subCategoryFilter
-        : true;
+        const result = await res.json();
+        const subArray = result.data ?? result ?? [];
 
-      return matchCategory && matchSubCategory;
-    });
-  }, [rows, categoryFilter, subCategoryFilter]);
+        // 🔥 Update sub category dropdown
+        const formattedSubCategories = subArray.map((item: any) => ({
+          value: item.product_category,
+          label: item.product_category,
+        }));
 
-  /* -------------------- Handlers -------------------- */
-  const addNewRow = () => {
-    const newRow: ProductRow = {
-      id: `temp-${Date.now()}`,
-      isNew: true,
-      category: categoryFilter ?? "",
-      sub_category: subCategoryFilter ?? "",
-      status: "active",
+        setSubCategories(formattedSubCategories);
+
+        // 🔥 ALSO update table rows
+        setRows(
+          subArray.map((item: any, index: number) => ({
+            id: index.toString(),
+            category: categoryFilter,
+            sub_category: item.product_category,
+            status: "active",
+          })),
+        );
+      } catch (err) {
+        console.error("Sub category error:", err);
+      }
     };
 
-    setRows((prev) => [newRow, ...prev]);
-  };
+    fetchSubCategories();
+  }, [categoryFilter, businessId]);
 
-  const clearFilters = () => {
-    setCategoryFilter(undefined);
-    setSubCategoryFilter(undefined);
-  };
+  const filteredRows = useMemo(() => {
+    if (!subCategoryFilter) return rows;
 
-  /* -------------------- Loading State -------------------- */
+    return rows.filter((row) => row.sub_category === subCategoryFilter);
+  }, [rows, subCategoryFilter]);
+
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", minHeight: 400 }}>
+      <div
+        style={{ display: "flex", justifyContent: "center", minHeight: 400 }}
+      >
         <Spin size="large" />
       </div>
     );
@@ -196,28 +183,18 @@ export default function ProductDataEntry() {
           </Text>
         </div>
 
-        <Button type="primary" icon={<PlusOutlined />} onClick={addNewRow}>
+        <Button type="primary" icon={<PlusOutlined />}>
           Add New Category
         </Button>
       </div>
 
-      {error && (
-        <Alert
-          message={error}
-          type="error"
-          showIcon
-          closable
-          onClose={() => setError(null)}
-        />
-      )}
+      {error && <Alert message={error} type="error" showIcon closable />}
 
       <Card>
-        {/* Filters */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={12}>
             <Text strong>Category Filter</Text>
             <Select
-              showSearch
               allowClear
               placeholder="Select category"
               style={{ width: "100%", marginTop: 6 }}
@@ -226,78 +203,33 @@ export default function ProductDataEntry() {
                 setCategoryFilter(val);
                 setSubCategoryFilter(undefined);
               }}
-              options={categoryOptions}
+              options={categories}
             />
           </Col>
 
           <Col span={12}>
             <Text strong>Sub Category Filter</Text>
             <Select
-              showSearch
               allowClear
               placeholder="Select sub category"
               style={{ width: "100%", marginTop: 6 }}
               value={subCategoryFilter}
               onChange={setSubCategoryFilter}
-              options={subCategoryOptions}
+              options={subCategories}
               disabled={!categoryFilter}
             />
           </Col>
         </Row>
 
-        {(categoryFilter || subCategoryFilter) && (
-          <div style={{ textAlign: "center", marginBottom: 12 }}>
-            <Text type="secondary">
-              Showing {filteredRows.length} of {rows.length} categories
-            </Text>
-            <Button type="link" size="small" onClick={clearFilters}>
-              Clear Filters
-            </Button>
-          </div>
-        )}
-
-        {/* Table */}
-        <Table
-          dataSource={filteredRows}
-          pagination={false}
-          rowKey="id"
-          rowClassName={(record) =>
-            record.isNew
-              ? "row-new"
-              : record.status === "inactive"
-              ? "row-inactive"
-              : ""
-          }
-          locale={{
-            emptyText: (
-              <div style={{ padding: 40 }}>
-                <Text type="secondary">
-                  No categories available. Click "Add New Category" to begin.
-                </Text>
-              </div>
-            ),
-          }}
-        >
-          <Table.Column title="Category" dataIndex="category" key="category" />
-          <Table.Column
-            title="Sub Category"
-            dataIndex="sub_category"
-            key="sub_category"
-          />
+        <Table dataSource={filteredRows} rowKey="id" pagination={false}>
+          <Table.Column title="Category" dataIndex="category" />
+          <Table.Column title="Sub Category" dataIndex="sub_category" />
         </Table>
       </Card>
 
-      {/* Summary */}
       <Card size="small">
-        <Text type="secondary">Active: </Text>
-        <Text strong>
-          {filteredRows.filter((r) => r.status === "active" && !r.isNew).length}
-        </Text>
-
-        <Text type="secondary" style={{ marginLeft: 12 }}>
-          Inactive:{" "}
-          {filteredRows.filter((r) => r.status === "inactive").length}
-        </Text>
+        <Text type="secondary">Total: </Text>
+        <Text strong>{filteredRows.length}</Text>
       </Card>
     </div>
   );
