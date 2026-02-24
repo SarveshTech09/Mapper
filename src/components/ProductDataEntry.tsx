@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Save, X, AlertCircle, Check, Trash2 } from 'lucide-react';
 import ReactSelect from 'react-select';
+import CreatableSelect from 'react-select/creatable';
 import { useUserData } from '../hooks/useUserData';
 import { useCategories } from '../hooks/useCategories';
 import { useSubCategories } from '../hooks/useSubCategories';
@@ -307,21 +308,61 @@ export default function ProductDataEntry() {
               filteredRows.map((row) => (
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : row.status === 'inactive' ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'} transition-colors`}>
                   <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.brand_name}
-                      onChange={(e) => updateRow(row.id, 'brand_name', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    <CreatableSelect
+                      value={row.brand_name ? { value: row.brand_name, label: row.brand_name } : null}
+                      onChange={(selectedOption: OptionType | null) => {
+                        updateRow(row.id, 'brand_name', selectedOption?.value || '');
+                      }}
+                      options={[]}
                       placeholder="Brand"
+                      className="text-sm"
+                      menuPortalTarget={document.body}
+                      styles={{
+                        control: (provided) => ({
+                          ...provided,
+                          minWidth: 150,
+                          minHeight: 36,
+                        }),
+                        valueContainer: (provided) => ({
+                          ...provided,
+                          paddingLeft: 8,
+                          paddingRight: 8,
+                        }),
+                        menuPortal: (provided) => ({
+                          ...provided,
+                          zIndex: 9999,
+                        }),
+                      }}
+                      isSearchable
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.product_name}
-                      onChange={(e) => updateRow(row.id, 'product_name', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    <CreatableSelect
+                      value={row.product_name ? { value: row.product_name, label: row.product_name } : null}
+                      onChange={(selectedOption: OptionType | null) => {
+                        updateRow(row.id, 'product_name', selectedOption?.value || '');
+                      }}
+                      options={[]}
                       placeholder="Product Name"
+                      className="text-sm"
+                      menuPortalTarget={document.body}
+                      styles={{
+                        control: (provided) => ({
+                          ...provided,
+                          minWidth: 150,
+                          minHeight: 36,
+                        }),
+                        valueContainer: (provided) => ({
+                          ...provided,
+                          paddingLeft: 8,
+                          paddingRight: 8,
+                        }),
+                        menuPortal: (provided) => ({
+                          ...provided,
+                          zIndex: 9999,
+                        }),
+                      }}
+                      isSearchable
                     />
                   </td>
                   <td className="px-3 py-2">

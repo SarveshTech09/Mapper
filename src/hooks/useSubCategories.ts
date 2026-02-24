@@ -4,11 +4,6 @@ interface SubCategory {
   product_category: string;
 }
 
-interface OptionType {
-  value: string;
-  label: string;
-}
-
 // Custom hook that provides a function to fetch subcategories
 export const useSubCategories = () => {
   const [loading, setLoading] = useState<boolean>(false);
