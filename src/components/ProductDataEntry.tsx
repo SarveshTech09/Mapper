@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Plus, Save, X, AlertCircle, Check, Trash2 } from 'lucide-react';
 import ReactSelect from 'react-select';
+import { useUserData } from '../hooks/useUserData';
+import { useCategories } from '../hooks/useCategories';
+import { useSubCategories } from '../hooks/useSubCategories';
 
 // Define the Option type for react-select
 interface OptionType {
@@ -34,152 +37,53 @@ interface ProductRow {
 
 export default function ProductDataEntry() {
   const [rows, setRows] = useState<ProductRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [businessId, setBusinessId] = useState<number | null>(null);
+  // Fetch user data using custom hook
+  const { userData, loading: userLoading, error: userError } = useUserData();
+  const businessId = userData?.business_id || null;
+  const subCategoryId = userData?.sub_category_id || null;
 
-  const [categories, setCategories] = useState<
-    { value: string; label: string }[]
-  >([]);
+  // Fetch categories using custom hook
+  const { categories, loading: categoriesLoading, error: categoriesError } = useCategories(businessId, subCategoryId);
+
+  // Fetch subcategories using custom hook
+  const { fetchSubCategories, loading: subCategoriesLoading, error: subCategoriesError } = useSubCategories();
 
 
 
-  // State to track selected category for each row
-  const [selectedCategories, setSelectedCategories] = useState<{[key: string]: string}>({});
-
-  /* ================= LOAD INITIAL DATA ================= */
+  // Initialize with one empty row when categories are loaded
   useEffect(() => {
-    const fetchInitialData = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) return;
+    if (!categoriesLoading && categories.length > 0 && rows.length === 0) {
+      setRows([{ 
+        id: `initial-${Date.now()}`, 
+        isNew: true, 
+        product_name: '', 
+        brand_name: '', 
+        generic_name: '', 
+        category: '', 
+        sub_category: '', 
+        dosage_form: '', 
+        strength: '', 
+        base_pack_size: '', 
+        hsn_code: '', 
+        gst_percentage: 12, 
+        schedule_type: '', 
+        prescription_required: false, 
+        storage_condition: '', 
+        manufacturer: '', 
+        barcode: '', 
+        has_variants: false, 
+        variant_type: '', 
+        status: 'active',
+        availableSubCategories: [],
+      }]);
+    }
+  }, [categoriesLoading, categories, rows]);
 
-      try {
-        setLoading(true);
 
-        // 1️⃣ Get business ID
-        const meRes = await fetch(`${import.meta.env.VITE_BASE_URL}/api/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const meData = await meRes.json();
-        const id = meData.business_id;
-        const subCategoryId = meData.sub_category_id || null;
-        setBusinessId(id);
-
-        // 2️⃣ Get Categories for dropdown and initial display
-        const categoryRes = await fetch(
-          `${import.meta.env.VITE_BASE_URL}/api/getCategory`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              business_id: id,
-              sub_category_id: subCategoryId,
-            }),
-          },
-        );
-
-        const categoryData = await categoryRes.json();
-        const categoryArray = categoryData.data ?? [];
-
-        // Set categories for dropdown
-        setCategories(
-          categoryArray.map((item: any) => ({
-            value: item.category_type,
-            label: item.category_type,
-          })),
-        );
-
-        // Initialize with one empty row
-        setRows([{ 
-          id: `initial-${Date.now()}`, 
-          isNew: true, 
-          product_name: '', 
-          brand_name: '', 
-          generic_name: '', 
-          category: '', 
-          sub_category: '', 
-          dosage_form: '', 
-          strength: '', 
-          base_pack_size: '', 
-          hsn_code: '', 
-          gst_percentage: 12, 
-          schedule_type: '', 
-          prescription_required: false, 
-          storage_condition: '', 
-          manufacturer: '', 
-          barcode: '', 
-          has_variants: false, 
-          variant_type: '', 
-          status: 'active',
-          availableSubCategories: [],
-        }]);
-      } catch (err) {
-        setError("Failed to load data.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInitialData();
-  }, []);
-
-  /* ================= LOAD SUB CATEGORIES WHEN CATEGORY CHANGES ================= */
-  useEffect(() => {
-    const fetchSubCategories = async (rowId: string, selectedCategory: string) => {
-      if (!selectedCategory || !businessId) {
-        return;
-      }
-
-      const token = localStorage.getItem("access_token");
-      if (!token) return;
-
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_BASE_URL}/api/optical/getCategory/${businessId}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              category_type: selectedCategory,
-            }),
-          },
-        );
-
-        const result = await res.json();
-        const subArray = result.data ?? result ?? [];
-
-        // Format subcategories
-        const formattedSubCategories = subArray.map((item: any) => ({
-          value: item.product_category,
-          label: item.product_category,
-        }));
-
-        // Update the specific row with available subcategories
-        setRows(prev => 
-          prev.map(row => 
-            row.id === rowId ? { ...row, availableSubCategories: formattedSubCategories } : row
-          )
-        );
-      } catch (err) {
-        // Error handling for subcategories fetch
-      }
-    };
-
-    // Process each selected category
-    Object.entries(selectedCategories).forEach(([rowId, category]) => {
-      fetchSubCategories(rowId, category);
-    });
-  }, [selectedCategories, businessId]);
 
   const addNewRow = () => {
     const newRow: ProductRow = {
@@ -208,24 +112,44 @@ export default function ProductDataEntry() {
     setRows([newRow, ...rows]);
   };
 
-  const updateRow = (id: string, field: keyof ProductRow, value: any) => {
-    setRows(rows.map(row =>
-      row.id === id ? { ...row, [field]: value } : row
-    ));
-
-    // Update selected category when category changes
-    if (field === 'category') {
-      setSelectedCategories(prev => ({
-        ...prev,
-        [id]: value
-      }));
-      
-      // Reset subcategory when category changes
+  const updateRow = async (id: string, field: keyof ProductRow, value: any) => {
+    if (field === 'category' && businessId) {
+      // Update the category first
       setRows(prev => 
-        prev.map(r => 
-          r.id === id ? { ...r, sub_category: '' } : r
+        prev.map(row =>
+          row.id === id ? { ...row, [field]: value } : row
         )
       );
+      
+      // Fetch and update subcategories for this specific row
+      if (value) {  // Only fetch if category is not empty
+        const subCategories = await fetchSubCategories(businessId, value);
+        
+        setRows(prev => 
+          prev.map(row => {
+            if (row.id === id) {
+              // Reset sub_category if it doesn't exist in the new list
+              const shouldResetSubCategory = row.sub_category && !subCategories.some(sc => sc.value === row.sub_category);
+              const newSubCategory = shouldResetSubCategory ? '' : row.sub_category;
+              
+              return { ...row, availableSubCategories: subCategories, sub_category: newSubCategory };
+            }
+            return row;
+          })
+        );
+      } else {
+        // Clear subcategories if category is cleared
+        setRows(prev => 
+          prev.map(row =>
+            row.id === id ? { ...row, availableSubCategories: [], sub_category: '' } : row
+          )
+        );
+      }
+    } else {
+      // For other fields, just update normally
+      setRows(rows.map(row =>
+        row.id === id ? { ...row, [field]: value } : row
+      ));
     }
   };
 
@@ -288,12 +212,17 @@ export default function ProductDataEntry() {
     setRows(rows.filter(row => row.id !== id));
   };
 
-  if (loading) {
+  if (userLoading || categoriesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
+  }
+
+  // Combine errors from all hooks
+  if (userError || categoriesError || subCategoriesError) {
+    setError(userError || categoriesError || subCategoriesError || "Failed to load data");
   }
 
   // Show all rows since filters have been removed
@@ -338,8 +267,8 @@ export default function ProductDataEntry() {
           <thead className="bg-gray-50 sticky top-0">
             <tr>
               {[
-                { key: 'product_name', label: 'Product Name *', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]' },
                 { key: 'brand_name', label: 'Brand Name', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
+                { key: 'product_name', label: 'Product Name *', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]' },
                 { key: 'generic_name', label: 'Generic Name', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
                 { key: 'category', label: 'Category', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
                 { key: 'sub_category', label: 'Sub Category', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
@@ -380,19 +309,19 @@ export default function ProductDataEntry() {
                   <td className="px-3 py-2">
                     <input
                       type="text"
-                      value={row.product_name}
-                      onChange={(e) => updateRow(row.id, 'product_name', e.target.value)}
+                      value={row.brand_name}
+                      onChange={(e) => updateRow(row.id, 'brand_name', e.target.value)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Product Name"
+                      placeholder="Brand"
                     />
                   </td>
                   <td className="px-3 py-2">
                     <input
                       type="text"
-                      value={row.brand_name}
-                      onChange={(e) => updateRow(row.id, 'brand_name', e.target.value)}
+                      value={row.product_name}
+                      onChange={(e) => updateRow(row.id, 'product_name', e.target.value)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Brand"
+                      placeholder="Product Name"
                     />
                   </td>
                   <td className="px-3 py-2">
