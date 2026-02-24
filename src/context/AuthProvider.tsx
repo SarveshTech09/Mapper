@@ -17,6 +17,7 @@ interface AuthContextType {
   token: string | null;
   user: User | null;
   loading: boolean;
+  initialized: boolean;
   login: (accessToken: string, userData: User) => void;
   logout: () => void;
 }
@@ -31,12 +32,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [initialized, setInitialized] = useState<boolean>(false);
 
   // Load from localStorage on first render
   useEffect(() => {
     console.log('AuthProvider: Loading auth state from localStorage');
-    const storedToken = localStorage.getItem("access_token");
-    const storedUser = localStorage.getItem("user");
+    
+    // Safely get items from localStorage
+    let storedToken = null;
+    let storedUser = null;
+    
+    try {
+      storedToken = localStorage.getItem("access_token");
+      storedUser = localStorage.getItem("user");
+    } catch (error) {
+      console.error('AuthProvider: Error accessing localStorage:', error);
+      // Clear any problematic localStorage data
+      try {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
+      } catch (clearError) {
+        console.error('AuthProvider: Error clearing localStorage:', clearError);
+      }
+    }
 
     console.log('AuthProvider: Found stored token:', !!storedToken);
     console.log('AuthProvider: Token length:', storedToken?.length);
@@ -84,6 +102,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Set loading to false after checking localStorage
     console.log('AuthProvider: Setting loading to false');
     setLoading(false);
+    setInitialized(true);
   }, []);
 
   const login = (accessToken: string, userData: User) => {
@@ -92,9 +111,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(userData);
     setLoading(false);
 
-    localStorage.setItem("access_token", accessToken);
-    localStorage.setItem("user", JSON.stringify(userData));
-    console.log('AuthProvider: Auth data saved to localStorage');
+    try {
+      localStorage.setItem("access_token", accessToken);
+      localStorage.setItem("user", JSON.stringify(userData));
+      console.log('AuthProvider: Auth data saved to localStorage');
+    } catch (error) {
+      console.error('AuthProvider: Error saving to localStorage:', error);
+    }
   };
 
   const logout = () => {
@@ -102,12 +125,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setLoading(false);
 
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user");
+    try {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("user");
+    } catch (error) {
+      console.error('AuthProvider: Error removing from localStorage:', error);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, login, logout }}>
+    <AuthContext.Provider value={{ token, user, loading, initialized, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
