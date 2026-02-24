@@ -59,7 +59,7 @@ export default function ProductDataEntry() {
   const { brands, brandsLoading, brandsError, fetchBrands } = useBrands();
 
   // Fetch products by brand using custom hook
-  const { productsLoading, productsError, fetchProducts } = useProductsByBrand();
+  const { productsError, fetchProducts } = useProductsByBrand();
 
   // State to store products for each row by brand
   const [rowProductsMap, setRowProductsMap] = useState<Record<string, string[]>>({});
@@ -68,9 +68,18 @@ export default function ProductDataEntry() {
 
 
 
-  // Initialize with one empty row when categories are loaded
+  // Fetch brands when component mounts and when user data becomes available
   useEffect(() => {
-    if (!categoriesLoading && categories.length > 0 && rows.length === 0) {
+    // Only fetch brands when user data is available and not already loaded
+    if (userData && !brandsLoading && brands.length === 0) {
+      fetchBrands();
+    }
+  }, [userData, brandsLoading, brands, fetchBrands]);
+
+  // Initialize with one empty row when all required data is loaded
+  useEffect(() => {
+    // Initialize with one empty row when user data and categories are loaded
+    if (!userLoading && !categoriesLoading && !brandsLoading && rows.length === 0) {
       setRows([{ 
         id: `initial-${Date.now()}`, 
         isNew: true, 
@@ -95,15 +104,7 @@ export default function ProductDataEntry() {
         availableSubCategories: [],
       }]);
     }
-  }, [categoriesLoading, categories, rows]);
-
-  // Fetch brands when component mounts and when user data becomes available
-  useEffect(() => {
-    // Only fetch brands when user data is available and not already loaded
-    if (userData && !brandsLoading && brands.length === 0) {
-      fetchBrands();
-    }
-  }, [userData, brandsLoading, brands, fetchBrands]);
+  }, [userLoading, categoriesLoading, brandsLoading, rows.length]);
 
 
 
@@ -281,7 +282,7 @@ export default function ProductDataEntry() {
     setRows(rows.filter(row => row.id !== id));
   };
 
-  if (userLoading || categoriesLoading) {
+  if (userLoading || categoriesLoading || brandsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

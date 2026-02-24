@@ -134,10 +134,16 @@ function App() {
             </nav>
           </div>
 
-          <div className="p-6 md:p-8">
-            {activeTab === 'dashboard' && <InventoryDashboard />}
-            {activeTab === 'product-entry' && <ProductDataEntry />}
-            {activeTab === 'inventory-entry' && <InventoryDataEntry />}
+          <div className="p-6 md:p-8 relative">
+            <div className={`transition-opacity duration-200 ${activeTab === 'dashboard' ? 'opacity-100' : 'opacity-0 pointer-events-none absolute inset-0'}`}>
+              <InventoryDashboard />
+            </div>
+            <div className={`transition-opacity duration-200 ${activeTab === 'product-entry' ? 'opacity-100' : 'opacity-0 pointer-events-none absolute inset-0'}`}>
+              <ProductDataEntry />
+            </div>
+            <div className={`transition-opacity duration-200 ${activeTab === 'inventory-entry' ? 'opacity-100' : 'opacity-0 pointer-events-none absolute inset-0'}`}>
+              <InventoryDataEntry />
+            </div>
           </div>
         </div>
 
