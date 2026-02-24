@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
 import { AlertCircle, Check } from 'lucide-react';
 
 interface ProductFormProps {
@@ -45,14 +44,21 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
     setSuccess(false);
 
     try {
-      const { error: insertError } = await supabase
-        .from('product_master')
-        .insert([{
-          ...formData,
-          gst_percentage: parseFloat(formData.gst_percentage) || 0,
-        }]);
+      // Mock submission since we removed Supabase dependency
+      // Save to localStorage in a real application
+      const productData = {
+        id: Math.random().toString(36).substring(7), // Generate mock ID
+        ...formData,
+        gst_percentage: parseFloat(formData.gst_percentage) || 0,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-      if (insertError) throw insertError;
+      // Save to localStorage
+      const existingProducts = JSON.parse(localStorage.getItem('products') || '[]');
+      existingProducts.push(productData);
+      localStorage.setItem('products', JSON.stringify(existingProducts));
 
       setSuccess(true);
       setFormData({

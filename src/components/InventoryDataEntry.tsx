@@ -45,7 +45,6 @@ export default function InventoryDataEntry() {
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
-    console.log('Component mounted, loading data...');
     loadData();
   }, []);
 
@@ -76,9 +75,6 @@ export default function InventoryDataEntry() {
   }, [handleKeyboardShortcut]);
   
   useEffect(() => {
-    console.log('Products updated:', products);
-    console.log('Products count:', products.length);
-    console.log('Product details:', products.map(p => ({ id: p.id, name: p.product_name })));
   }, [products]);
 
   const loadData = async () => {
@@ -91,9 +87,6 @@ export default function InventoryDataEntry() {
         
         if (response.ok) {
           const data = await response.json();
-          console.log('API Success - Full response:', data);
-          console.log('API Response type:', Array.isArray(data) ? 'array' : typeof data);
-          
           // Handle the actual API response structure
           // API returns an array of batch objects with embedded product info
           let apiProducts: Product[] = [];
@@ -121,19 +114,12 @@ export default function InventoryDataEntry() {
             apiProducts = Array.from(productMap.values());
             apiBatches = data;
             
-            console.log('Extracted products from API:', apiProducts);
-            console.log('Batches from API:', apiBatches);
+      
           } else {
-            console.log('API returned unexpected format:', data);
             throw new Error('Unexpected API response format');
           }
           
-          console.log('Final products to load:', apiProducts);
-          
           setProducts(apiProducts);
-          console.log('Products set in state:', apiProducts);
-          console.log('Number of products:', apiProducts.length);
-          console.log('Product names:', apiProducts.map(p => p.product_name));
 
           const formattedRows: BatchRow[] = apiBatches.map((batch: any) => {
             return {
@@ -160,16 +146,12 @@ export default function InventoryDataEntry() {
           });
 
           setRows(formattedRows);
-          
-          // No need to initialize search terms with ReactSelect
           return;
         }
       } catch (apiError) {
-        console.log('API call failed, using mock data:', apiError);
       }
       
       // Fallback to mock data if API fails
-      console.log('Using mock data as fallback');
       const mockProducts: Product[] = [
         {
           id: '1',
@@ -196,13 +178,9 @@ export default function InventoryDataEntry() {
       ];
       
       setProducts(mockProducts);
-      console.log('Mock products set:', mockProducts);
-      
-      // Initialize with empty rows for mock data
       setRows([]);
       
     } catch (err) {
-      console.error('Load data error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
       // Initialize with empty data on error
       setProducts([]);
@@ -236,8 +214,6 @@ export default function InventoryDataEntry() {
     };
     
     setRows([newRow, ...rows]);
-    
-    console.log('Products available when adding new row:', products);
   };
 
   const updateRow = (id: string, field: keyof BatchRow, value: any) => {

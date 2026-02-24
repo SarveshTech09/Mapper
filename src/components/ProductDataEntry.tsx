@@ -121,7 +121,6 @@ export default function ProductDataEntry() {
           availableSubCategories: [],
         }]);
       } catch (err) {
-        console.error(err);
         setError("Failed to load data.");
       } finally {
         setLoading(false);
@@ -172,7 +171,7 @@ export default function ProductDataEntry() {
           )
         );
       } catch (err) {
-        console.error(`Error fetching subcategories for row ${rowId}:`, err);
+        // Error handling for subcategories fetch
       }
     };
 

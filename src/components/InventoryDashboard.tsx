@@ -1,6 +1,51 @@
 import { useEffect, useState } from 'react';
-import { supabase, Product, Batch } from '../lib/supabase';
 import { Package, AlertTriangle, Calendar, MapPin, Thermometer } from 'lucide-react';
+
+// Define types locally since we removed Supabase dependency
+interface Product {
+  id: string;
+  product_name: string;
+  brand_name: string | null;
+  generic_name: string | null;
+  category: string | null;
+  sub_category: string | null;
+  dosage_form: string | null;
+  strength: string | null;
+  base_pack_size: string | null;
+  hsn_code: string | null;
+  gst_percentage: number;
+  schedule_type: string | null;
+  prescription_required: boolean;
+  storage_condition: string | null;
+  has_variants: boolean;
+  variant_type: string | null;
+  manufacturer: string | null;
+  drug_license_no: string | null;
+  barcode: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Batch {
+  id: string;
+  product_id: string;
+  variant_value: string | null;
+  batch_number: string;
+  manufacturing_date: string | null;
+  expiry_date: string | null;
+  purchase_rate: number;
+  mrp: number;
+  gst_percentage: number;
+  initial_quantity: number;
+  current_stock_qty: number;
+  warehouse_location: string | null;
+  cold_storage: boolean;
+  supplier_name: string | null;
+  purchase_invoice_no: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 interface ProductWithBatches extends Product {
   batches: Batch[];
@@ -19,24 +64,13 @@ export default function InventoryDashboard() {
     try {
       setLoading(true);
 
-      const { data: productsData, error: productsError } = await supabase
-        .from('product_master')
-        .select('*')
-        .eq('status', 'active')
-        .order('product_name');
+      // Load from localStorage since we removed Supabase dependency
+      const storedProducts = JSON.parse(localStorage.getItem('products') || '[]');
+      const storedBatches = JSON.parse(localStorage.getItem('batches') || '[]');
 
-      if (productsError) throw productsError;
-
-      const { data: batchesData, error: batchesError } = await supabase
-        .from('batch_master')
-        .select('*')
-        .order('expiry_date');
-
-      if (batchesError) throw batchesError;
-
-      const productsWithBatches = (productsData || []).map(product => ({
+      const productsWithBatches = storedProducts.map((product: any) => ({
         ...product,
-        batches: (batchesData || []).filter(batch => batch.product_id === product.id)
+        batches: storedBatches.filter((batch: any) => batch.product_id === product.id)
       }));
 
       setProducts(productsWithBatches);

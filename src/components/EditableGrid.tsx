@@ -1,6 +1,30 @@
 import { useEffect, useState } from 'react';
-import { supabase, Batch } from '../lib/supabase';
 import { Edit2, Check, X, AlertCircle, Trash2 } from 'lucide-react';
+
+// Define Batch type locally since we removed Supabase dependency
+interface Batch {
+  id: string;
+  product_id: string;
+  variant_value: string | null;
+  batch_number: string;
+  manufacturing_date: string | null;
+  expiry_date: string | null;
+  purchase_rate: number;
+  mrp: number;
+  gst_percentage: number;
+  initial_quantity: number;
+  current_stock_qty: number;
+  warehouse_location: string | null;
+  cold_storage: boolean;
+  supplier_name: string | null;
+  purchase_invoice_no: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface EditableBatch extends Batch {
+  product_name?: string;
+}
 
 interface EditableBatch extends Batch {
   product_name?: string;
@@ -21,22 +45,15 @@ export default function EditableGrid() {
   const fetchBatches = async () => {
     try {
       setLoading(true);
-      const { data: batchesData, error: batchesError } = await supabase
-        .from('batch_master')
-        .select('*')
-        .order('created_at', { ascending: false });
+      
+      // Load from localStorage or use mock data since we removed Supabase dependency
+      const storedBatches = JSON.parse(localStorage.getItem('batches') || '[]');
+      const storedProducts = JSON.parse(localStorage.getItem('products') || '[]');
+      
+      // Create a product map for product names
+      const productsMap = new Map(storedProducts.map((p: any) => [p.id, p.product_name]));
 
-      if (batchesError) throw batchesError;
-
-      const { data: productsData, error: productsError } = await supabase
-        .from('product_master')
-        .select('id, product_name');
-
-      if (productsError) throw productsError;
-
-      const productsMap = new Map(productsData?.map(p => [p.id, p.product_name]) || []);
-
-      const batchesWithProducts = (batchesData || []).map(batch => ({
+      const batchesWithProducts = storedBatches.map((batch: any) => ({
         ...batch,
         product_name: productsMap.get(batch.product_id) || 'Unknown Product'
       }));
@@ -74,22 +91,19 @@ export default function EditableGrid() {
 
   const handleSave = async (id: string) => {
     try {
-      const { error: updateError } = await supabase
-        .from('batch_master')
-        .update({
-          batch_number: editedData.batch_number,
-          current_stock_qty: editedData.current_stock_qty,
-          purchase_rate: editedData.purchase_rate,
-          mrp: editedData.mrp,
-          warehouse_location: editedData.warehouse_location || null,
-          supplier_name: editedData.supplier_name || null,
-          expiry_date: editedData.expiry_date || null,
-          manufacturing_date: editedData.manufacturing_date || null,
+      // Update the batch in localStorage since we removed Supabase dependency
+      const storedBatches = JSON.parse(localStorage.getItem('batches') || '[]');
+      const batchIndex = storedBatches.findIndex((b: any) => b.id === id);
+      
+      if (batchIndex !== -1) {
+        storedBatches[batchIndex] = {
+          ...storedBatches[batchIndex],
+          ...editedData,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-
-      if (updateError) throw updateError;
+        };
+        
+        localStorage.setItem('batches', JSON.stringify(storedBatches));
+      }
 
       setSuccess('Batch updated successfully');
       setEditingId(null);
@@ -108,12 +122,11 @@ export default function EditableGrid() {
     }
 
     try {
-      const { error: deleteError } = await supabase
-        .from('batch_master')
-        .delete()
-        .eq('id', id);
-
-      if (deleteError) throw deleteError;
+      // Delete the batch from localStorage since we removed Supabase dependency
+      const storedBatches = JSON.parse(localStorage.getItem('batches') || '[]');
+      const updatedBatches = storedBatches.filter((b: any) => b.id !== id);
+      
+      localStorage.setItem('batches', JSON.stringify(updatedBatches));
 
       setSuccess('Batch deleted successfully');
       await fetchBatches();

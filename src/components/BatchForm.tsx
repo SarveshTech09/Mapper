@@ -1,6 +1,31 @@
 import { useState, useEffect } from 'react';
-import { supabase, Product } from '../lib/supabase';
 import { AlertCircle, Check, Search } from 'lucide-react';
+
+// Define Product type locally since we removed Supabase dependency
+interface Product {
+  id: string;
+  product_name: string;
+  brand_name: string | null;
+  generic_name: string | null;
+  category: string | null;
+  sub_category: string | null;
+  dosage_form: string | null;
+  strength: string | null;
+  base_pack_size: string | null;
+  hsn_code: string | null;
+  gst_percentage: number;
+  schedule_type: string | null;
+  prescription_required: boolean;
+  storage_condition: string | null;
+  has_variants: boolean;
+  variant_type: string | null;
+  manufacturer: string | null;
+  drug_license_no: string | null;
+  barcode: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface BatchFormProps {
   onSuccess: () => void;
@@ -49,16 +74,62 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
   }, [searchTerm, products]);
 
   const fetchProducts = async () => {
+    // Mock data since we removed Supabase dependency
     try {
-      const { data, error } = await supabase
-        .from('product_master')
-        .select('*')
-        .eq('status', 'active')
-        .order('product_name');
-
-      if (error) throw error;
-      setProducts(data || []);
-      setFilteredProducts(data || []);
+      // In a real application without backend, you might load from localStorage or props
+      const mockProducts: Product[] = [
+        {
+          id: '1',
+          product_name: 'Paracetamol 500mg',
+          brand_name: 'Crocin',
+          generic_name: 'Acetaminophen',
+          category: 'Pain Relief',
+          sub_category: 'Tablets',
+          dosage_form: 'Tablet',
+          strength: '500mg',
+          base_pack_size: '10 tablets',
+          hsn_code: '292429',
+          gst_percentage: 12,
+          schedule_type: 'OTC',
+          prescription_required: false,
+          storage_condition: 'Store below 30°C',
+          has_variants: false,
+          variant_type: null,
+          manufacturer: 'GSK',
+          drug_license_no: 'DL-123456',
+          barcode: '1234567890123',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          product_name: 'Aspirin 75mg',
+          brand_name: 'Ecosprin',
+          generic_name: 'Acetylsalicylic Acid',
+          category: 'Cardiovascular',
+          sub_category: 'Tablets',
+          dosage_form: 'Tablet',
+          strength: '75mg',
+          base_pack_size: '14 tablets',
+          hsn_code: '292630',
+          gst_percentage: 12,
+          schedule_type: 'Schedule H',
+          prescription_required: true,
+          storage_condition: 'Store below 25°C',
+          has_variants: false,
+          variant_type: null,
+          manufacturer: 'Sun Pharma',
+          drug_license_no: 'DL-789012',
+          barcode: '2345678901234',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ];
+      
+      setProducts(mockProducts);
+      setFilteredProducts(mockProducts);
     } catch (err) {
       console.error('Error fetching products:', err);
     }
@@ -98,25 +169,49 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
     try {
       const initialQty = parseInt(formData.initial_quantity) || 0;
 
-      const { error: insertError } = await supabase
-        .from('batch_master')
-        .insert([{
-          product_id: formData.product_id,
-          batch_number: formData.batch_number,
-          manufacturing_date: formData.manufacturing_date || null,
-          expiry_date: formData.expiry_date || null,
-          purchase_rate: parseFloat(formData.purchase_rate) || 0,
-          mrp: parseFloat(formData.mrp) || 0,
-          gst_percentage: parseFloat(formData.gst_percentage) || 0,
-          initial_quantity: initialQty,
-          current_stock_qty: initialQty,
-          warehouse_location: formData.warehouse_location || null,
-          cold_storage: formData.cold_storage,
-          supplier_name: formData.supplier_name || null,
-          purchase_invoice_no: formData.purchase_invoice_no || null,
-        }]);
+      // Mock submission since we removed Supabase dependency
+      // In a real application without backend, you might save to localStorage
+      console.log('Submitting batch data:', {
+        product_id: formData.product_id,
+        batch_number: formData.batch_number,
+        manufacturing_date: formData.manufacturing_date || null,
+        expiry_date: formData.expiry_date || null,
+        purchase_rate: parseFloat(formData.purchase_rate) || 0,
+        mrp: parseFloat(formData.mrp) || 0,
+        gst_percentage: parseFloat(formData.gst_percentage) || 0,
+        initial_quantity: initialQty,
+        current_stock_qty: initialQty,
+        warehouse_location: formData.warehouse_location || null,
+        cold_storage: formData.cold_storage,
+        supplier_name: formData.supplier_name || null,
+        purchase_invoice_no: formData.purchase_invoice_no || null,
+      });
 
-      if (insertError) throw insertError;
+      // Simulate a successful submission
+      // In a real app, you might save to localStorage or another local store
+      const batchData = {
+        id: Math.random().toString(36).substring(7), // Generate mock ID
+        product_id: formData.product_id,
+        batch_number: formData.batch_number,
+        manufacturing_date: formData.manufacturing_date || null,
+        expiry_date: formData.expiry_date || null,
+        purchase_rate: parseFloat(formData.purchase_rate) || 0,
+        mrp: parseFloat(formData.mrp) || 0,
+        gst_percentage: parseFloat(formData.gst_percentage) || 0,
+        initial_quantity: initialQty,
+        current_stock_qty: initialQty,
+        warehouse_location: formData.warehouse_location || null,
+        cold_storage: formData.cold_storage,
+        supplier_name: formData.supplier_name || null,
+        purchase_invoice_no: formData.purchase_invoice_no || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Save to localStorage if needed
+      const existingBatches = JSON.parse(localStorage.getItem('batches') || '[]');
+      existingBatches.push(batchData);
+      localStorage.setItem('batches', JSON.stringify(existingBatches));
 
       setSuccess(true);
       setFormData({
