@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Save, X, AlertCircle, Check, Trash2, Keyboard, Search } from 'lucide-react';
+import { Plus, Save, X, AlertCircle, Check, Trash2, Keyboard } from 'lucide-react';
+import ReactSelect from 'react-select';
 
 interface Product {
   id: string;
@@ -42,8 +43,6 @@ export default function InventoryDataEntry() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
-  const [showDropdowns, setShowDropdowns] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     console.log('Component mounted, loading data...');
@@ -136,8 +135,6 @@ export default function InventoryDataEntry() {
           console.log('Number of products:', apiProducts.length);
           console.log('Product names:', apiProducts.map(p => p.product_name));
 
-          const productsMap = new Map(apiProducts.map((p: Product) => [p.id, p]));
-
           const formattedRows: BatchRow[] = apiBatches.map((batch: any) => {
             return {
               id: batch.id.toString(),
@@ -164,17 +161,7 @@ export default function InventoryDataEntry() {
 
           setRows(formattedRows);
           
-          // Initialize search terms for existing rows
-          const initialSearchTerms: Record<string, string> = {};
-          const initialShowDropdowns: Record<string, boolean> = {};
-          
-          formattedRows.forEach(row => {
-            initialSearchTerms[row.id] = row.product_name;
-            initialShowDropdowns[row.id] = false;
-          });
-          
-          setSearchTerms(initialSearchTerms);
-          setShowDropdowns(initialShowDropdowns);
+          // No need to initialize search terms with ReactSelect
           return;
         }
       } catch (apiError) {
@@ -213,8 +200,6 @@ export default function InventoryDataEntry() {
       
       // Initialize with empty rows for mock data
       setRows([]);
-      setSearchTerms({});
-      setShowDropdowns({});
       
     } catch (err) {
       console.error('Load data error:', err);
@@ -222,8 +207,6 @@ export default function InventoryDataEntry() {
       // Initialize with empty data on error
       setProducts([]);
       setRows([]);
-      setSearchTerms({});
-      setShowDropdowns({});
     } finally {
       setLoading(false);
     }
@@ -253,17 +236,6 @@ export default function InventoryDataEntry() {
     };
     
     setRows([newRow, ...rows]);
-    
-    // Initialize search term for the new row
-    setSearchTerms(prev => ({
-      ...prev,
-      [newRow.id]: ''
-    }));
-    
-    setShowDropdowns(prev => ({
-      ...prev,
-      [newRow.id]: false
-    }));
     
     console.log('Products available when adding new row:', products);
   };
@@ -364,35 +336,8 @@ export default function InventoryDataEntry() {
     }
   };
 
-  const handleSearchChange = (rowId: string, value: string) => {
-    setSearchTerms(prev => ({
-      ...prev,
-      [rowId]: value
-    }));
-    
-    // Update the row's product_id based on search if exact match is found
-    if (value.trim() === '') {
-      updateRow(rowId, 'product_id', '');
-    } else {
-      const matchedProduct = products.find(p => 
-        p.product_name.toLowerCase() === value.toLowerCase()
-      );
-      if (matchedProduct) {
-        updateRow(rowId, 'product_id', matchedProduct.id);
-      }
-    }
-  };
-  
   const handleProductSelect = (rowId: string, product: Product) => {
     updateRow(rowId, 'product_id', product.id);
-    setSearchTerms(prev => ({
-      ...prev,
-      [rowId]: product.product_name
-    }));
-    setShowDropdowns(prev => ({
-      ...prev,
-      [rowId]: false
-    }));
   };
   
 
@@ -545,75 +490,47 @@ export default function InventoryDataEntry() {
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : 'hover:bg-gray-50'} transition-colors`}>
                   <td className="px-3 py-2">
                     {row.isNew ? (
-                      <div className="relative">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={searchTerms[row.id] || ''}
-                            onChange={(e) => handleSearchChange(row.id, e.target.value)}
-                            onFocus={() => {
-                              console.log('Products available for dropdown:', products);
-                              console.log('showDropdowns state:', showDropdowns);
-                              setShowDropdowns(prev => ({ ...prev, [row.id]: true }));
-                            }}
-                            onBlur={() => setTimeout(() => {
-                              setShowDropdowns(prev => ({ ...prev, [row.id]: false }));
-                            }, 200)}
-                            className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Search product..."
-                          />
-                        </div>
-
-                        {showDropdowns[row.id] && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                            <div className="p-2 bg-blue-50 text-xs">
-                              Debug: Products available: {products.length}, Filtered: {
-                                products.filter(p => 
-                                  !searchTerms[row.id] || 
-                                  p.product_name.toLowerCase().includes((searchTerms[row.id] || '').toLowerCase()) ||
-                                  (p.brand_name && p.brand_name.toLowerCase().includes((searchTerms[row.id] || '').toLowerCase()))
-                                ).length
-                              }
-                            </div>
-                            {(() => {
-                              const filteredProducts = products
-                                .filter(p => 
-                                  !searchTerms[row.id] || 
-                                  p.product_name.toLowerCase().includes((searchTerms[row.id] || '').toLowerCase()) ||
-                                  (p.brand_name && p.brand_name.toLowerCase().includes((searchTerms[row.id] || '').toLowerCase()))
-                                );
-                              
-                              console.log('Filtered products for row', row.id, ':', filteredProducts);
-                              console.log('All products:', products);
-                              console.log('Search term:', searchTerms[row.id]);
-                              
-                              if (filteredProducts.length === 0 && products.length > 0) {
-                                return (
-                                  <div className="p-4 text-center text-gray-500">
-                                    No matching products found
-                                    <div className="text-xs mt-1">Search term: "{searchTerms[row.id] || '(empty)'}"</div>
-                                  </div>
-                                );
-                              }
-                              
-                              return filteredProducts.map(product => (
-                                <button
-                                  key={product.id}
-                                  type="button"
-                                  onClick={() => handleProductSelect(row.id, product)}
-                                  className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
-                                >
-                                  <div className="font-medium text-gray-900">{product.product_name}</div>
-                                  {product.brand_name && (
-                                    <div className="text-sm text-gray-500">{product.brand_name}</div>
-                                  )}
-                                </button>
-                              ));
-                            })()}
-                          </div>
-                        )}
-                      </div>
+                      <ReactSelect
+                        value={products.find(p => p.id === row.product_id) 
+                          ? { value: row.product_id, label: `${products.find(p => p.id === row.product_id)?.product_name}${products.find(p => p.id === row.product_id)?.brand_name ? ` (${products.find(p => p.id === row.product_id)?.brand_name})` : ''}` } 
+                          : null}
+                        onChange={(selectedOption: { value: string; label: string } | null) => {
+                          if (selectedOption) {
+                            const product = products.find(p => p.id === selectedOption.value);
+                            if (product) {
+                              handleProductSelect(row.id, product);
+                            }
+                          } else {
+                            updateRow(row.id, 'product_id', '');
+                          }
+                        }}
+                        options={products.map(product => ({
+                          value: product.id,
+                          label: `${product.product_name}${product.brand_name ? ` (${product.brand_name})` : ''}`
+                        }))}
+                        placeholder="Search product..."
+                        className="text-sm"
+                        menuPortalTarget={document.body}
+                        styles={{
+                          control: (provided) => ({
+                            ...provided,
+                            minWidth: 200,
+                            minHeight: 36,
+                          }),
+                          menuPortal: (provided) => ({
+                            ...provided,
+                            zIndex: 9999,
+                          }),
+                          valueContainer: (provided) => ({
+                            ...provided,
+                            paddingLeft: 8,
+                            paddingRight: 8,
+                          }),
+                        }}
+                        isSearchable
+                        closeMenuOnSelect={true}
+                        blurInputOnSelect={true}
+                      />
                     ) : (
                       <select
                         value={row.product_id}
