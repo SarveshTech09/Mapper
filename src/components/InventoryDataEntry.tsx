@@ -81,71 +81,7 @@ export default function InventoryDataEntry() {
     try {
       setLoading(true);
       
-      // First try the API
-      try {
-        const response = await fetch('http://localhost:5000/api/inventory-data');
-        
-        if (response.ok) {
-          const data = await response.json();
-          let apiProducts: Product[] = [];
-          let apiBatches: any[] = [];
-          
-          if (Array.isArray(data)) {
-            // Extract unique products from batch data
-            const productMap = new Map<string, Product>();
-            
-            data.forEach((batch: any) => {
-              if (!productMap.has(batch.product_id)) {
-                productMap.set(batch.product_id, {
-                  id: batch.product_id,
-                  product_name: batch.product_name,
-                  brand_name: batch.brand_name || undefined,
-                  generic_name: undefined,
-                  has_variants: batch.has_variants || false,
-                  variant_type: batch.variant_type || undefined,
-                  gst_percentage: parseFloat(batch.gst_percentage) || 12,
-                  strength: undefined
-                });
-              }
-            });
-            
-            apiProducts = Array.from(productMap.values());
-            apiBatches = data;
-          } else {
-            throw new Error('Unexpected API response format');
-          }
 
-          setProducts(apiProducts);
-
-          const formattedRows: BatchRow[] = apiBatches.map((batch: any) => {
-            return {
-              id: batch.id.toString(),
-              isNew: false,
-              product_id: batch.product_id.toString(),
-              product_name: batch.product_name || 'Unknown',
-              product_has_variants: batch.has_variants || false,
-              product_variant_type: batch.variant_type || '',
-              variant_value: batch.variant_value || '',
-              batch_number: batch.batch_number,
-              manufacturing_date: batch.manufacturing_date ? batch.manufacturing_date.split('T')[0] : '',
-              expiry_date: batch.expiry_date ? batch.expiry_date.split('T')[0] : '',
-              purchase_rate: parseFloat(batch.purchase_rate) || 0,
-              mrp: parseFloat(batch.mrp) || 0,
-              gst_percentage: parseFloat(batch.gst_percentage) || 12,
-              initial_quantity: batch.initial_quantity || 0,
-              current_stock_qty: batch.current_stock_qty || 0,
-              warehouse_location: batch.warehouse_location || '',
-              cold_storage: batch.cold_storage || false,
-              supplier_name: batch.supplier_name || '',
-              purchase_invoice_no: batch.purchase_invoice_no || '',
-            };
-          });
-
-          setRows(formattedRows);
-          return;
-        }
-      } catch (apiError) {
-      }
       // Fallback to mock data if API fails
       const mockProducts: Product[] = [
         {
