@@ -8,7 +8,6 @@ import { useSubCategories } from '../hooks/useSubCategories';
 import useBrands from '../hooks/useBrands';
 import useProductsByBrand from '../hooks/useProductsByBrand';
 
-// Define the Option type for react-select
 interface OptionType {
   value: string;
   label: string;
@@ -44,42 +43,29 @@ export default function ProductDataEntry() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Fetch user data using custom hook
-  const { userData, loading: userLoading, error: userError } = useUserData();
-  const businessId = userData?.business_id || null;
-  const subCategoryId = userData?.sub_category_id || null;
+    const { userData, loading: userLoading, error: userError } = useUserData();
+    const businessId = userData?.business_id || null;
+    const subCategoryId = userData?.sub_category_id || null;
 
-  // Fetch categories using custom hook
-  const { categories, loading: categoriesLoading, error: categoriesError } = useCategories(businessId, subCategoryId);
-
-  // Fetch subcategories using custom hook
-  const { fetchSubCategories, error: subCategoriesError } = useSubCategories();
-
-  // Fetch brands using custom hook
-  const { brands, brandsLoading, brandsError, fetchBrands } = useBrands();
-
-  // Fetch products by brand using custom hook
-  const { productsError, fetchProducts } = useProductsByBrand();
-
-  // State to store products for each row by brand
-  const [rowProductsMap, setRowProductsMap] = useState<Record<string, string[]>>({});
-  // State to track loading status per row
-  const [rowLoadingMap, setRowLoadingMap] = useState<Record<string, boolean>>({});
+    const { categories, loading: categoriesLoading, error: categoriesError } = useCategories(businessId, subCategoryId);
+    const { fetchSubCategories, error: subCategoriesError } = useSubCategories();
+    const { brands, brandsLoading, brandsError, fetchBrands } = useBrands();
+    const { productsError, fetchProducts } = useProductsByBrand();
+    const [rowProductsMap, setRowProductsMap] = useState<Record<string, string[]>>({});
+    const [rowLoadingMap, setRowLoadingMap] = useState<Record<string, boolean>>({});
+    const [rowSubCategoryLoadingMap, setRowSubCategoryLoadingMap] = useState<Record<string, boolean>>({});
+    const [categoriesLoadingState, setCategoriesLoadingState] = useState<boolean>(false);
 
 
 
-  // Fetch brands when component mounts and when user data becomes available
-  useEffect(() => {
-    // Only fetch brands when user data is available and not already loaded
-    if (userData && !brandsLoading && brands.length === 0) {
+    useEffect(() => {
+        if (userData && !brandsLoading && brands.length === 0) {
       fetchBrands();
     }
   }, [userData, brandsLoading, brands, fetchBrands]);
 
-  // Initialize with one empty row when all required data is loaded
-  useEffect(() => {
-    // Initialize with one empty row when user data and categories are loaded
-    if (!userLoading && !categoriesLoading && !brandsLoading && rows.length === 0) {
+    useEffect(() => {
+        if (!userLoading && !categoriesLoading && !brandsLoading && rows.length === 0) {
       setRows([{ 
         id: `initial-${Date.now()}`, 
         isNew: true, 
@@ -137,22 +123,24 @@ export default function ProductDataEntry() {
 
   const updateRow = async (id: string, field: keyof ProductRow, value: any) => {
     if (field === 'category' && businessId) {
-      // Update the category first
-      setRows(prev => 
+      // Set loading state for categories
+      setCategoriesLoadingState(true);
+
+            setRows(prev => 
         prev.map(row =>
           row.id === id ? { ...row, [field]: value } : row
         )
       );
       
-      // Fetch and update subcategories for this specific row
-      if (value) {  // Only fetch if category is not empty
+            if (value) {
+                setRowSubCategoryLoadingMap(prev => ({ ...prev, [id]: true }));
+        
         const subCategories = await fetchSubCategories(businessId, value);
         
         setRows(prev => 
           prev.map(row => {
             if (row.id === id) {
-              // Reset sub_category if it doesn't exist in the new list
-              const shouldResetSubCategory = row.sub_category && !subCategories.some(sc => sc.value === row.sub_category);
+                            const shouldResetSubCategory = row.sub_category && !subCategories.some(sc => sc.value === row.sub_category);
               const newSubCategory = shouldResetSubCategory ? '' : row.sub_category;
               
               return { ...row, availableSubCategories: subCategories, sub_category: newSubCategory };
@@ -160,64 +148,57 @@ export default function ProductDataEntry() {
             return row;
           })
         );
+        
+        setRowSubCategoryLoadingMap(prev => ({ ...prev, [id]: false }));
+        setCategoriesLoadingState(false);
       } else {
-        // Clear subcategories if category is cleared
-        setRows(prev => 
+                setRows(prev => 
           prev.map(row =>
             row.id === id ? { ...row, availableSubCategories: [], sub_category: '' } : row
           )
         );
+        setRowSubCategoryLoadingMap(prev => ({ ...prev, [id]: false }));
+        setCategoriesLoadingState(false);
       }
     } else if (field === 'brand_name') {
-      // Update the brand name first
-      setRows(prev => 
+            setRows(prev => 
         prev.map(row =>
           row.id === id ? { ...row, [field]: value } : row
         )
       );
       
-      // Fetch and update products for this specific row if brand is selected
-      if (value) {  // Only fetch if brand is not empty
+            if (value) {
         try {
           const brandName = value;
           const rowBrandKey = `${id}-${brandName}`;
           
-          // Set loading state for this specific row
-          setRowLoadingMap(prev => ({ ...prev, [id]: true }));
+                    setRowLoadingMap(prev => ({ ...prev, [id]: true }));
           
-          // Fetch products and get the result directly
-          const productsData = await fetchProducts({ brand_name: brandName });
+                    const productsData = await fetchProducts({ brand_name: brandName });
           
-          // Update the row products map with the fetched products
-          setRowProductsMap(prev => ({
+                    setRowProductsMap(prev => ({
             ...prev,
             [rowBrandKey]: [...productsData]
           }));
           
-          // Clear loading state for this row
-          setRowLoadingMap(prev => ({ ...prev, [id]: false }));
+                    setRowLoadingMap(prev => ({ ...prev, [id]: false }));
         } catch (error) {
-          // Error handling done via setError state
-          setRowLoadingMap(prev => ({ ...prev, [id]: false }));
+                    setRowLoadingMap(prev => ({ ...prev, [id]: false }));
         }
       } else {
-        // Clear products and loading state when brand is cleared
-        setRowProductsMap(prev => {
+                setRowProductsMap(prev => {
           const newMap = { ...prev };
-          // Remove all entries for this row
-          Object.keys(newMap).forEach(key => {
+                    Object.keys(newMap).forEach(key => {
             if (key.startsWith(`${id}-`)) {
               delete newMap[key];
             }
           });
           return newMap;
         });
-        // Clear loading state for this row
-        setRowLoadingMap(prev => ({ ...prev, [id]: false }));
+                setRowLoadingMap(prev => ({ ...prev, [id]: false }));
       }
     } else {
-      // For other fields, just update normally
-      setRows(rows.map(row =>
+            setRows(rows.map(row =>
         row.id === id ? { ...row, [field]: value } : row
       ));
     }
@@ -233,17 +214,14 @@ export default function ProductDataEntry() {
     setError(null);
 
     try {
-      // Simulate save operation (removed Supabase calls)
-      if (row.isNew) {
-        // Add new row to state
-        const newRows = rows.map(r => 
+            if (row.isNew) {
+                const newRows = rows.map(r => 
           r.id === row.id ? { ...row, isNew: false } : r
         );
         setRows(newRows);
         setSuccess('Product added successfully');
       } else {
-        // Update existing row
-        const newRows = rows.map(r => 
+                const newRows = rows.map(r => 
           r.id === row.id ? { ...row } : r
         );
         setRows(newRows);
@@ -269,8 +247,7 @@ export default function ProductDataEntry() {
     }
 
     try {
-      // Simulate delete operation (removed Supabase calls)
-      setRows(rows.filter(r => r.id !== row.id));
+            setRows(rows.filter(r => r.id !== row.id));
       setSuccess('Product deleted successfully');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
@@ -290,19 +267,16 @@ export default function ProductDataEntry() {
     );
   }
 
-  // Combine errors from all hooks
-  if (userError || categoriesError || subCategoriesError || brandsError || productsError) {
+    if (userError || categoriesError || subCategoriesError || brandsError || productsError) {
     setError(userError || categoriesError || subCategoriesError || brandsError || productsError || "Failed to load data");
   }
 
-  // Convert brands array to options format for react-select
-  const brandOptions = brands.map(brand => ({
+    const brandOptions = brands.map(brand => ({
     value: brand,
     label: brand
   }));
 
-  // Function to get product options for a specific row
-  const getProductOptions = (row: ProductRow) => {
+    const getProductOptions = (row: ProductRow) => {
     const rowBrandKey = `${row.id}-${row.brand_name}`;
     const productsForRow = rowProductsMap[rowBrandKey] || [];
     return productsForRow.map(product => ({
@@ -311,8 +285,7 @@ export default function ProductDataEntry() {
     }));
   };
 
-  // Show all rows since filters have been removed
-  const filteredRows = rows;
+    const filteredRows = rows;
 
   return (
     <div className="space-y-4">
@@ -464,38 +437,15 @@ export default function ProductDataEntry() {
                   </td>
                   <td className="px-3 py-2">
                     <ReactSelect
-                      value={{ value: row.category, label: row.category }}
+                      value={row.category ? { value: row.category, label: row.category } : null}
                       onChange={(selectedOption: OptionType | null) => {
                         updateRow(row.id, 'category', selectedOption?.value || '');
                       }}
                       options={categories}
-                      placeholder="Select category..."
+                      placeholder={categoriesLoadingState ? "Loading categories..." : (row.category ? row.category : "Category...")}
                       className="text-sm"
                       menuPortalTarget={document.body}
-                      styles={{
-                        control: (provided) => ({
-                          ...provided,
-                          minWidth: 150,
-                          minHeight: 36,
-                        }),
-                        menuPortal: (provided) => ({
-                          ...provided,
-                          zIndex: 9999,
-                        }),
-                      }}
-                      isSearchable
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <ReactSelect
-                      value={{ value: row.sub_category, label: row.sub_category }}
-                      onChange={(selectedOption: OptionType | null) => {
-                        updateRow(row.id, 'sub_category', selectedOption?.value || '');
-                      }}
-                      options={row.availableSubCategories || []}
-                      placeholder="Select sub-category..."
-                      className="text-sm"
-                      menuPortalTarget={document.body}   // ✅ ADD THIS
+                      isLoading={categoriesLoadingState}
                       styles={{
                         control: (provided) => ({
                           ...provided,
@@ -513,6 +463,36 @@ export default function ProductDataEntry() {
                         }),
                       }}
                       isSearchable
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <ReactSelect
+                      value={row.sub_category ? { value: row.sub_category, label: row.sub_category } : null}
+                      onChange={(selectedOption: OptionType | null) => {
+                        updateRow(row.id, 'sub_category', selectedOption?.value || '');
+                      }}
+                      options={row.availableSubCategories || []}
+                      placeholder={rowSubCategoryLoadingMap[row.id] ? "Loading sub-categories..." : (row.sub_category ? row.sub_category : (row.category ? "Select sub-category..." : "SubCategory..."))}
+                      className="text-sm"
+                      menuPortalTarget={document.body}
+                      styles={{
+                        control: (provided) => ({
+                          ...provided,
+                          minWidth: 150,
+                          minHeight: 36,
+                        }),
+                        valueContainer: (provided) => ({
+                          ...provided,
+                          paddingLeft: 8,
+                          paddingRight: 8,
+                        }),
+                        menuPortal: (provided) => ({
+                          ...provided,
+                          zIndex: 9999,
+                        }),
+                      }}
+                      isSearchable
+                      isLoading={rowSubCategoryLoadingMap[row.id] && !!row.category}
                       isDisabled={!row.category}
                       closeMenuOnSelect={true}
                       blurInputOnSelect={true}
