@@ -87,8 +87,6 @@ export default function InventoryDataEntry() {
         
         if (response.ok) {
           const data = await response.json();
-          // Handle the actual API response structure
-          // API returns an array of batch objects with embedded product info
           let apiProducts: Product[] = [];
           let apiBatches: any[] = [];
           
@@ -113,12 +111,10 @@ export default function InventoryDataEntry() {
             
             apiProducts = Array.from(productMap.values());
             apiBatches = data;
-            
-      
           } else {
             throw new Error('Unexpected API response format');
           }
-          
+
           setProducts(apiProducts);
 
           const formattedRows: BatchRow[] = apiBatches.map((batch: any) => {
@@ -150,7 +146,6 @@ export default function InventoryDataEntry() {
         }
       } catch (apiError) {
       }
-      
       // Fallback to mock data if API fails
       const mockProducts: Product[] = [
         {

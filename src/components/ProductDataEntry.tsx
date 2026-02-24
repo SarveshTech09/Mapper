@@ -5,6 +5,8 @@ import CreatableSelect from 'react-select/creatable';
 import { useUserData } from '../hooks/useUserData';
 import { useCategories } from '../hooks/useCategories';
 import { useSubCategories } from '../hooks/useSubCategories';
+import useBrands from '../hooks/useBrands';
+import useProductsByBrand from '../hooks/useProductsByBrand';
 
 // Define the Option type for react-select
 interface OptionType {
@@ -51,7 +53,18 @@ export default function ProductDataEntry() {
   const { categories, loading: categoriesLoading, error: categoriesError } = useCategories(businessId, subCategoryId);
 
   // Fetch subcategories using custom hook
-  const { fetchSubCategories, loading: subCategoriesLoading, error: subCategoriesError } = useSubCategories();
+  const { fetchSubCategories, error: subCategoriesError } = useSubCategories();
+
+  // Fetch brands using custom hook
+  const { brands, brandsLoading, brandsError, fetchBrands } = useBrands();
+
+  // Fetch products by brand using custom hook
+  const { productsLoading, productsError, fetchProducts } = useProductsByBrand();
+
+  // State to store products for each row by brand
+  const [rowProductsMap, setRowProductsMap] = useState<Record<string, string[]>>({});
+  // State to track loading status per row
+  const [rowLoadingMap, setRowLoadingMap] = useState<Record<string, boolean>>({});
 
 
 
@@ -83,6 +96,14 @@ export default function ProductDataEntry() {
       }]);
     }
   }, [categoriesLoading, categories, rows]);
+
+  // Fetch brands when component mounts and when user data becomes available
+  useEffect(() => {
+    // Only fetch brands when user data is available and not already loaded
+    if (userData && !brandsLoading && brands.length === 0) {
+      fetchBrands();
+    }
+  }, [userData, brandsLoading, brands, fetchBrands]);
 
 
 
@@ -145,6 +166,53 @@ export default function ProductDataEntry() {
             row.id === id ? { ...row, availableSubCategories: [], sub_category: '' } : row
           )
         );
+      }
+    } else if (field === 'brand_name') {
+      // Update the brand name first
+      setRows(prev => 
+        prev.map(row =>
+          row.id === id ? { ...row, [field]: value } : row
+        )
+      );
+      
+      // Fetch and update products for this specific row if brand is selected
+      if (value) {  // Only fetch if brand is not empty
+        try {
+          const brandName = value;
+          const rowBrandKey = `${id}-${brandName}`;
+          
+          // Set loading state for this specific row
+          setRowLoadingMap(prev => ({ ...prev, [id]: true }));
+          
+          // Fetch products and get the result directly
+          const productsData = await fetchProducts({ brand_name: brandName });
+          
+          // Update the row products map with the fetched products
+          setRowProductsMap(prev => ({
+            ...prev,
+            [rowBrandKey]: [...productsData]
+          }));
+          
+          // Clear loading state for this row
+          setRowLoadingMap(prev => ({ ...prev, [id]: false }));
+        } catch (error) {
+          // Error handling done via setError state
+          setRowLoadingMap(prev => ({ ...prev, [id]: false }));
+        }
+      } else {
+        // Clear products and loading state when brand is cleared
+        setRowProductsMap(prev => {
+          const newMap = { ...prev };
+          // Remove all entries for this row
+          Object.keys(newMap).forEach(key => {
+            if (key.startsWith(`${id}-`)) {
+              delete newMap[key];
+            }
+          });
+          return newMap;
+        });
+        // Clear loading state for this row
+        setRowLoadingMap(prev => ({ ...prev, [id]: false }));
       }
     } else {
       // For other fields, just update normally
@@ -222,9 +290,25 @@ export default function ProductDataEntry() {
   }
 
   // Combine errors from all hooks
-  if (userError || categoriesError || subCategoriesError) {
-    setError(userError || categoriesError || subCategoriesError || "Failed to load data");
+  if (userError || categoriesError || subCategoriesError || brandsError || productsError) {
+    setError(userError || categoriesError || subCategoriesError || brandsError || productsError || "Failed to load data");
   }
+
+  // Convert brands array to options format for react-select
+  const brandOptions = brands.map(brand => ({
+    value: brand,
+    label: brand
+  }));
+
+  // Function to get product options for a specific row
+  const getProductOptions = (row: ProductRow) => {
+    const rowBrandKey = `${row.id}-${row.brand_name}`;
+    const productsForRow = rowProductsMap[rowBrandKey] || [];
+    return productsForRow.map(product => ({
+      value: product,
+      label: product
+    }));
+  };
 
   // Show all rows since filters have been removed
   const filteredRows = rows;
@@ -313,8 +397,8 @@ export default function ProductDataEntry() {
                       onChange={(selectedOption: OptionType | null) => {
                         updateRow(row.id, 'brand_name', selectedOption?.value || '');
                       }}
-                      options={[]}
-                      placeholder="Brand"
+                      options={brandOptions}
+                      placeholder={brandsLoading ? "Loading brands..." : "Brand"}
                       className="text-sm"
                       menuPortalTarget={document.body}
                       styles={{
@@ -334,6 +418,7 @@ export default function ProductDataEntry() {
                         }),
                       }}
                       isSearchable
+                      isLoading={brandsLoading}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -342,8 +427,8 @@ export default function ProductDataEntry() {
                       onChange={(selectedOption: OptionType | null) => {
                         updateRow(row.id, 'product_name', selectedOption?.value || '');
                       }}
-                      options={[]}
-                      placeholder="Product Name"
+                      options={getProductOptions(row)}
+                      placeholder={row.brand_name ? (rowLoadingMap[row.id] ? "Loading products..." : "Product Name") : "Select brand first"}
                       className="text-sm"
                       menuPortalTarget={document.body}
                       styles={{
@@ -363,6 +448,8 @@ export default function ProductDataEntry() {
                         }),
                       }}
                       isSearchable
+                      isLoading={rowLoadingMap[row.id] && !!row.brand_name}
+                      isDisabled={!row.brand_name}
                     />
                   </td>
                   <td className="px-3 py-2">
