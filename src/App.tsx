@@ -9,7 +9,7 @@ import { useAuth } from './context/AuthProvider';
 type Tab = 'dashboard' | 'product-entry' | 'inventory-entry';
 
 function App() {
-  const { token, logout, loading } = useAuth();
+  const { token, logout, loading, initialized } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('inventory-entry');
 
   // Fetch user profile on token change
@@ -35,6 +35,7 @@ function App() {
             // If token is invalid, logout the user
             if (response.status === 401) {
               console.log('Token is invalid, logging out');
+              logout();
             }
           }
         } catch (error) {
@@ -44,7 +45,7 @@ function App() {
 
       fetchUserProfile();
     }
-  }, [token, ]);
+  }, [token, logout]);
 
   const handleLogout = () => {
     logout();
@@ -55,7 +56,7 @@ function App() {
   };
 
   // Show loading state while checking auth
-  if (loading) {
+  if (loading || !initialized) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -72,7 +73,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div key={`${!!token}-${initialized}`} className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
@@ -134,10 +135,16 @@ function App() {
             </nav>
           </div>
 
-          <div className="p-6 md:p-8">
-            {activeTab === 'dashboard' && <InventoryDashboard />}
-            {activeTab === 'product-entry' && <ProductDataEntry />}
-            {activeTab === 'inventory-entry' && <InventoryDataEntry />}
+          <div className="p-6 md:p-8 relative" style={{ minHeight: '500px' }}>
+            <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-200 ${activeTab === 'dashboard' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+              <InventoryDashboard />
+            </div>
+            <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-200 ${activeTab === 'product-entry' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+              <ProductDataEntry />
+            </div>
+            <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-200 ${activeTab === 'inventory-entry' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+              <InventoryDataEntry />
+            </div>
           </div>
         </div>
 

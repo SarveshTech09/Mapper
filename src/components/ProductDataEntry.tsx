@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Plus, Save, X, AlertCircle, Check, Trash2 } from 'lucide-react';
 import ReactSelect from 'react-select';
+import CreatableSelect from 'react-select/creatable';
+import { useUserData } from '../hooks/useUserData';
+import { useCategories } from '../hooks/useCategories';
+import { useSubCategories } from '../hooks/useSubCategories';
+import useBrands from '../hooks/useBrands';
+import useProductsByBrand from '../hooks/useProductsByBrand';
 
 // Define the Option type for react-select
 interface OptionType {
@@ -34,152 +40,73 @@ interface ProductRow {
 
 export default function ProductDataEntry() {
   const [rows, setRows] = useState<ProductRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [businessId, setBusinessId] = useState<number | null>(null);
+  // Fetch user data using custom hook
+  const { userData, loading: userLoading, error: userError } = useUserData();
+  const businessId = userData?.business_id || null;
+  const subCategoryId = userData?.sub_category_id || null;
 
-  const [categories, setCategories] = useState<
-    { value: string; label: string }[]
-  >([]);
+  // Fetch categories using custom hook
+  const { categories, loading: categoriesLoading, error: categoriesError } = useCategories(businessId, subCategoryId);
+
+  // Fetch subcategories using custom hook
+  const { fetchSubCategories, error: subCategoriesError } = useSubCategories();
+
+  // Fetch brands using custom hook
+  const { brands, brandsLoading, brandsError, fetchBrands } = useBrands();
+
+  // Fetch products by brand using custom hook
+  const { productsError, fetchProducts } = useProductsByBrand();
+
+  // State to store products for each row by brand
+  const [rowProductsMap, setRowProductsMap] = useState<Record<string, string[]>>({});
+  // State to track loading status per row
+  const [rowLoadingMap, setRowLoadingMap] = useState<Record<string, boolean>>({});
 
 
 
-  // State to track selected category for each row
-  const [selectedCategories, setSelectedCategories] = useState<{[key: string]: string}>({});
-
-  /* ================= LOAD INITIAL DATA ================= */
+  // Fetch brands when component mounts and when user data becomes available
   useEffect(() => {
-    const fetchInitialData = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) return;
+    // Only fetch brands when user data is available and not already loaded
+    if (userData && !brandsLoading && brands.length === 0) {
+      fetchBrands();
+    }
+  }, [userData, brandsLoading, brands, fetchBrands]);
 
-      try {
-        setLoading(true);
-
-        // 1️⃣ Get business ID
-        const meRes = await fetch(`${import.meta.env.VITE_BASE_URL}/api/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const meData = await meRes.json();
-        const id = meData.business_id;
-        const subCategoryId = meData.sub_category_id || null;
-        setBusinessId(id);
-
-        // 2️⃣ Get Categories for dropdown and initial display
-        const categoryRes = await fetch(
-          `${import.meta.env.VITE_BASE_URL}/api/getCategory`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              business_id: id,
-              sub_category_id: subCategoryId,
-            }),
-          },
-        );
-
-        const categoryData = await categoryRes.json();
-        const categoryArray = categoryData.data ?? [];
-
-        // Set categories for dropdown
-        setCategories(
-          categoryArray.map((item: any) => ({
-            value: item.category_type,
-            label: item.category_type,
-          })),
-        );
-
-        // Initialize with one empty row
-        setRows([{ 
-          id: `initial-${Date.now()}`, 
-          isNew: true, 
-          product_name: '', 
-          brand_name: '', 
-          generic_name: '', 
-          category: '', 
-          sub_category: '', 
-          dosage_form: '', 
-          strength: '', 
-          base_pack_size: '', 
-          hsn_code: '', 
-          gst_percentage: 12, 
-          schedule_type: '', 
-          prescription_required: false, 
-          storage_condition: '', 
-          manufacturer: '', 
-          barcode: '', 
-          has_variants: false, 
-          variant_type: '', 
-          status: 'active',
-          availableSubCategories: [],
-        }]);
-      } catch (err) {
-        setError("Failed to load data.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInitialData();
-  }, []);
-
-  /* ================= LOAD SUB CATEGORIES WHEN CATEGORY CHANGES ================= */
+  // Initialize with one empty row when all required data is loaded
   useEffect(() => {
-    const fetchSubCategories = async (rowId: string, selectedCategory: string) => {
-      if (!selectedCategory || !businessId) {
-        return;
-      }
+    // Initialize with one empty row when user data and categories are loaded
+    if (!userLoading && !categoriesLoading && !brandsLoading && rows.length === 0) {
+      setRows([{ 
+        id: `initial-${Date.now()}`, 
+        isNew: true, 
+        product_name: '', 
+        brand_name: '', 
+        generic_name: '', 
+        category: '', 
+        sub_category: '', 
+        dosage_form: '', 
+        strength: '', 
+        base_pack_size: '', 
+        hsn_code: '', 
+        gst_percentage: 12, 
+        schedule_type: '', 
+        prescription_required: false, 
+        storage_condition: '', 
+        manufacturer: '', 
+        barcode: '', 
+        has_variants: false, 
+        variant_type: '', 
+        status: 'active',
+        availableSubCategories: [],
+      }]);
+    }
+  }, [userLoading, categoriesLoading, brandsLoading, rows.length]);
 
-      const token = localStorage.getItem("access_token");
-      if (!token) return;
 
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_BASE_URL}/api/optical/getCategory/${businessId}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              category_type: selectedCategory,
-            }),
-          },
-        );
-
-        const result = await res.json();
-        const subArray = result.data ?? result ?? [];
-
-        // Format subcategories
-        const formattedSubCategories = subArray.map((item: any) => ({
-          value: item.product_category,
-          label: item.product_category,
-        }));
-
-        // Update the specific row with available subcategories
-        setRows(prev => 
-          prev.map(row => 
-            row.id === rowId ? { ...row, availableSubCategories: formattedSubCategories } : row
-          )
-        );
-      } catch (err) {
-        // Error handling for subcategories fetch
-      }
-    };
-
-    // Process each selected category
-    Object.entries(selectedCategories).forEach(([rowId, category]) => {
-      fetchSubCategories(rowId, category);
-    });
-  }, [selectedCategories, businessId]);
 
   const addNewRow = () => {
     const newRow: ProductRow = {
@@ -208,24 +135,91 @@ export default function ProductDataEntry() {
     setRows([newRow, ...rows]);
   };
 
-  const updateRow = (id: string, field: keyof ProductRow, value: any) => {
-    setRows(rows.map(row =>
-      row.id === id ? { ...row, [field]: value } : row
-    ));
-
-    // Update selected category when category changes
-    if (field === 'category') {
-      setSelectedCategories(prev => ({
-        ...prev,
-        [id]: value
-      }));
-      
-      // Reset subcategory when category changes
+  const updateRow = async (id: string, field: keyof ProductRow, value: any) => {
+    if (field === 'category' && businessId) {
+      // Update the category first
       setRows(prev => 
-        prev.map(r => 
-          r.id === id ? { ...r, sub_category: '' } : r
+        prev.map(row =>
+          row.id === id ? { ...row, [field]: value } : row
         )
       );
+      
+      // Fetch and update subcategories for this specific row
+      if (value) {  // Only fetch if category is not empty
+        const subCategories = await fetchSubCategories(businessId, value);
+        
+        setRows(prev => 
+          prev.map(row => {
+            if (row.id === id) {
+              // Reset sub_category if it doesn't exist in the new list
+              const shouldResetSubCategory = row.sub_category && !subCategories.some(sc => sc.value === row.sub_category);
+              const newSubCategory = shouldResetSubCategory ? '' : row.sub_category;
+              
+              return { ...row, availableSubCategories: subCategories, sub_category: newSubCategory };
+            }
+            return row;
+          })
+        );
+      } else {
+        // Clear subcategories if category is cleared
+        setRows(prev => 
+          prev.map(row =>
+            row.id === id ? { ...row, availableSubCategories: [], sub_category: '' } : row
+          )
+        );
+      }
+    } else if (field === 'brand_name') {
+      // Update the brand name first
+      setRows(prev => 
+        prev.map(row =>
+          row.id === id ? { ...row, [field]: value } : row
+        )
+      );
+      
+      // Fetch and update products for this specific row if brand is selected
+      if (value) {  // Only fetch if brand is not empty
+        try {
+          const brandName = value;
+          const rowBrandKey = `${id}-${brandName}`;
+          
+          // Set loading state for this specific row
+          setRowLoadingMap(prev => ({ ...prev, [id]: true }));
+          
+          // Fetch products and get the result directly
+          const productsData = await fetchProducts({ brand_name: brandName });
+          
+          // Update the row products map with the fetched products
+          setRowProductsMap(prev => ({
+            ...prev,
+            [rowBrandKey]: [...productsData]
+          }));
+          
+          // Clear loading state for this row
+          setRowLoadingMap(prev => ({ ...prev, [id]: false }));
+        } catch (error) {
+          // Error handling done via setError state
+          setRowLoadingMap(prev => ({ ...prev, [id]: false }));
+        }
+      } else {
+        // Clear products and loading state when brand is cleared
+        setRowProductsMap(prev => {
+          const newMap = { ...prev };
+          // Remove all entries for this row
+          Object.keys(newMap).forEach(key => {
+            if (key.startsWith(`${id}-`)) {
+              delete newMap[key];
+            }
+          });
+          return newMap;
+        });
+        // Clear loading state for this row
+        setRowLoadingMap(prev => ({ ...prev, [id]: false }));
+      }
+    } else {
+      // For other fields, just update normally
+      setRows(rows.map(row =>
+        row.id === id ? { ...row, [field]: value } : row
+      ));
     }
   };
 
@@ -288,13 +282,34 @@ export default function ProductDataEntry() {
     setRows(rows.filter(row => row.id !== id));
   };
 
-  if (loading) {
+  if (userLoading || categoriesLoading || brandsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
+
+  // Combine errors from all hooks
+  if (userError || categoriesError || subCategoriesError || brandsError || productsError) {
+    setError(userError || categoriesError || subCategoriesError || brandsError || productsError || "Failed to load data");
+  }
+
+  // Convert brands array to options format for react-select
+  const brandOptions = brands.map(brand => ({
+    value: brand,
+    label: brand
+  }));
+
+  // Function to get product options for a specific row
+  const getProductOptions = (row: ProductRow) => {
+    const rowBrandKey = `${row.id}-${row.brand_name}`;
+    const productsForRow = rowProductsMap[rowBrandKey] || [];
+    return productsForRow.map(product => ({
+      value: product,
+      label: product
+    }));
+  };
 
   // Show all rows since filters have been removed
   const filteredRows = rows;
@@ -337,54 +352,31 @@ export default function ProductDataEntry() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0">
             <tr>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]">
-                Product Name *
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]">
-                Brand Name
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]">
-                Generic Name
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                Category
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                Sub Category
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Dosage Form
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Strength
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                Pack Size
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                HSN Code
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[80px]">
-                GST %
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Schedule
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]">
-                Storage
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]">
-                Manufacturer
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                Barcode
-              </th>
-              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[80px]">
-                Rx Req
-              </th>
-              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]">
-                Actions
-              </th>
+              {[
+                { key: 'brand_name', label: 'Brand Name', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
+                { key: 'product_name', label: 'Product Name *', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]' },
+                { key: 'generic_name', label: 'Generic Name', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
+                { key: 'category', label: 'Category', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
+                { key: 'sub_category', label: 'Sub Category', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
+                { key: 'dosage_form', label: 'Dosage Form', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
+                { key: 'strength', label: 'Strength', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
+                { key: 'base_pack_size', label: 'Pack Size', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
+                { key: 'hsn_code', label: 'HSN Code', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
+                { key: 'gst_percentage', label: 'GST %', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[80px]' },
+                { key: 'schedule_type', label: 'Schedule', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
+                { key: 'storage_condition', label: 'Storage', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
+                { key: 'manufacturer', label: 'Manufacturer', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
+                { key: 'barcode', label: 'Barcode', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
+                { key: 'prescription_required', label: 'Rx Req', className: 'px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[80px]' },
+                { key: 'actions', label: 'Actions', className: 'px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]' },
+              ].map((header) => (
+                <th 
+                  key={header.key}
+                  className={header.className}
+                >
+                  {header.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -401,21 +393,64 @@ export default function ProductDataEntry() {
               filteredRows.map((row) => (
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : row.status === 'inactive' ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'} transition-colors`}>
                   <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.product_name}
-                      onChange={(e) => updateRow(row.id, 'product_name', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Product Name"
+                    <CreatableSelect
+                      value={row.brand_name ? { value: row.brand_name, label: row.brand_name } : null}
+                      onChange={(selectedOption: OptionType | null) => {
+                        updateRow(row.id, 'brand_name', selectedOption?.value || '');
+                      }}
+                      options={brandOptions}
+                      placeholder={brandsLoading ? "Loading brands..." : "Brand"}
+                      className="text-sm"
+                      menuPortalTarget={document.body}
+                      styles={{
+                        control: (provided) => ({
+                          ...provided,
+                          minWidth: 150,
+                          minHeight: 36,
+                        }),
+                        valueContainer: (provided) => ({
+                          ...provided,
+                          paddingLeft: 8,
+                          paddingRight: 8,
+                        }),
+                        menuPortal: (provided) => ({
+                          ...provided,
+                          zIndex: 9999,
+                        }),
+                      }}
+                      isSearchable
+                      isLoading={brandsLoading}
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.brand_name}
-                      onChange={(e) => updateRow(row.id, 'brand_name', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Brand"
+                    <CreatableSelect
+                      value={row.product_name ? { value: row.product_name, label: row.product_name } : null}
+                      onChange={(selectedOption: OptionType | null) => {
+                        updateRow(row.id, 'product_name', selectedOption?.value || '');
+                      }}
+                      options={getProductOptions(row)}
+                      placeholder={row.brand_name ? (rowLoadingMap[row.id] ? "Loading products..." : "Product Name") : "Select brand first"}
+                      className="text-sm"
+                      menuPortalTarget={document.body}
+                      styles={{
+                        control: (provided) => ({
+                          ...provided,
+                          minWidth: 150,
+                          minHeight: 36,
+                        }),
+                        valueContainer: (provided) => ({
+                          ...provided,
+                          paddingLeft: 8,
+                          paddingRight: 8,
+                        }),
+                        menuPortal: (provided) => ({
+                          ...provided,
+                          zIndex: 9999,
+                        }),
+                      }}
+                      isSearchable
+                      isLoading={rowLoadingMap[row.id] && !!row.brand_name}
+                      isDisabled={!row.brand_name}
                     />
                   </td>
                   <td className="px-3 py-2">
