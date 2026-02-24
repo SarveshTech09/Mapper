@@ -1,5 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Plus, Save, X, AlertCircle, Check, Trash2 } from 'lucide-react';
+import ReactSelect from 'react-select';
+
+// Define the Option type for react-select
+interface OptionType {
+  value: string;
+  label: string;
+}
 
 interface ProductRow {
   id: string;
@@ -38,9 +45,7 @@ export default function ProductDataEntry() {
     { value: string; label: string }[]
   >([]);
 
-  const [subCategories, setSubCategories] = useState<
-    { value: string; label: string }[]
-  >([]);
+
 
   // State to track selected category for each row
   const [selectedCategories, setSelectedCategories] = useState<{[key: string]: string}>({});
@@ -424,41 +429,60 @@ export default function ProductDataEntry() {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={row.category}
-                        onChange={(e) => {
-                          updateRow(row.id, 'category', e.target.value);
-                        }}
-                        list={`category-list-${row.id}`}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Select or type category..."
-                      />
-                      <datalist id={`category-list-${row.id}`}>
-                        {categories.map(cat => (
-                          <option key={cat.value} value={cat.value} label={cat.label} />
-                        ))}
-                      </datalist>
-                    </div>
+                    <ReactSelect
+                      value={{ value: row.category, label: row.category }}
+                      onChange={(selectedOption: OptionType | null) => {
+                        updateRow(row.id, 'category', selectedOption?.value || '');
+                      }}
+                      options={categories}
+                      placeholder="Select category..."
+                      className="text-sm"
+                      menuPortalTarget={document.body}
+                      styles={{
+                        control: (provided) => ({
+                          ...provided,
+                          minWidth: 150,
+                          minHeight: 36,
+                        }),
+                        menuPortal: (provided) => ({
+                          ...provided,
+                          zIndex: 9999,
+                        }),
+                      }}
+                      isSearchable
+                    />
                   </td>
                   <td className="px-3 py-2">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={row.sub_category}
-                        onChange={(e) => updateRow(row.id, 'sub_category', e.target.value)}
-                        list={`subcategory-list-${row.id}`}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Select or type sub-category..."
-                        disabled={!row.category}
-                      />
-                      <datalist id={`subcategory-list-${row.id}`}>
-                        {(row.availableSubCategories || []).map(sub => (
-                          <option key={sub.value} value={sub.value} label={sub.label} />
-                        ))}
-                      </datalist>
-                    </div>
+                    <ReactSelect
+                      value={{ value: row.sub_category, label: row.sub_category }}
+                      onChange={(selectedOption: OptionType | null) => {
+                        updateRow(row.id, 'sub_category', selectedOption?.value || '');
+                      }}
+                      options={row.availableSubCategories || []}
+                      placeholder="Select sub-category..."
+                      className="text-sm"
+                      menuPortalTarget={document.body}   // ✅ ADD THIS
+                      styles={{
+                        control: (provided) => ({
+                          ...provided,
+                          minWidth: 150,
+                          minHeight: 36,
+                        }),
+                        valueContainer: (provided) => ({
+                          ...provided,
+                          paddingLeft: 8,
+                          paddingRight: 8,
+                        }),
+                        menuPortal: (provided) => ({
+                          ...provided,
+                          zIndex: 9999,
+                        }),
+                      }}
+                      isSearchable
+                      isDisabled={!row.category}
+                      closeMenuOnSelect={true}
+                      blurInputOnSelect={true}
+                    />
                   </td>
                   <td className="px-3 py-2">
                     <input

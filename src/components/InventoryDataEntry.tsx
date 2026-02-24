@@ -1,6 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, Product } from '../lib/supabase';
-import { Plus, Save, X, AlertCircle, Check, Trash2, Keyboard } from 'lucide-react';
+import { Plus, Save, X, AlertCircle, Check, Trash2, Keyboard, Search } from 'lucide-react';
+
+interface Product {
+  id: string;
+  product_name: string;
+  brand_name?: string;
+  generic_name?: string;
+  has_variants: boolean;
+  variant_type?: string;
+  gst_percentage: number;
+  strength?: string;
+}
 
 interface BatchRow {
   id: string;
@@ -32,8 +42,11 @@ export default function InventoryDataEntry() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
+  const [showDropdowns, setShowDropdowns] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    console.log('Component mounted, loading data...');
     loadData();
   }, []);
 
@@ -62,58 +75,155 @@ export default function InventoryDataEntry() {
     window.addEventListener('keydown', handleKeyboardShortcut);
     return () => window.removeEventListener('keydown', handleKeyboardShortcut);
   }, [handleKeyboardShortcut]);
+  
+  useEffect(() => {
+    console.log('Products updated:', products);
+    console.log('Products count:', products.length);
+    console.log('Product details:', products.map(p => ({ id: p.id, name: p.product_name })));
+  }, [products]);
 
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      // First try the API
+      try {
+        const response = await fetch('http://localhost:5000/api/inventory-data');
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('API Success - Full response:', data);
+          console.log('API Response type:', Array.isArray(data) ? 'array' : typeof data);
+          
+          // Handle the actual API response structure
+          // API returns an array of batch objects with embedded product info
+          let apiProducts: Product[] = [];
+          let apiBatches: any[] = [];
+          
+          if (Array.isArray(data)) {
+            // Extract unique products from batch data
+            const productMap = new Map<string, Product>();
+            
+            data.forEach((batch: any) => {
+              if (!productMap.has(batch.product_id)) {
+                productMap.set(batch.product_id, {
+                  id: batch.product_id,
+                  product_name: batch.product_name,
+                  brand_name: batch.brand_name || undefined,
+                  generic_name: undefined,
+                  has_variants: batch.has_variants || false,
+                  variant_type: batch.variant_type || undefined,
+                  gst_percentage: parseFloat(batch.gst_percentage) || 12,
+                  strength: undefined
+                });
+              }
+            });
+            
+            apiProducts = Array.from(productMap.values());
+            apiBatches = data;
+            
+            console.log('Extracted products from API:', apiProducts);
+            console.log('Batches from API:', apiBatches);
+          } else {
+            console.log('API returned unexpected format:', data);
+            throw new Error('Unexpected API response format');
+          }
+          
+          console.log('Final products to load:', apiProducts);
+          
+          setProducts(apiProducts);
+          console.log('Products set in state:', apiProducts);
+          console.log('Number of products:', apiProducts.length);
+          console.log('Product names:', apiProducts.map(p => p.product_name));
 
-      const { data: productsData, error: productsError } = await supabase
-        .from('product_master')
-        .select('*')
-        .eq('status', 'active')
-        .order('product_name');
+          const productsMap = new Map(apiProducts.map((p: Product) => [p.id, p]));
 
-      if (productsError) throw productsError;
-      setProducts(productsData || []);
+          const formattedRows: BatchRow[] = apiBatches.map((batch: any) => {
+            return {
+              id: batch.id.toString(),
+              isNew: false,
+              product_id: batch.product_id.toString(),
+              product_name: batch.product_name || 'Unknown',
+              product_has_variants: batch.has_variants || false,
+              product_variant_type: batch.variant_type || '',
+              variant_value: batch.variant_value || '',
+              batch_number: batch.batch_number,
+              manufacturing_date: batch.manufacturing_date ? batch.manufacturing_date.split('T')[0] : '',
+              expiry_date: batch.expiry_date ? batch.expiry_date.split('T')[0] : '',
+              purchase_rate: parseFloat(batch.purchase_rate) || 0,
+              mrp: parseFloat(batch.mrp) || 0,
+              gst_percentage: parseFloat(batch.gst_percentage) || 12,
+              initial_quantity: batch.initial_quantity || 0,
+              current_stock_qty: batch.current_stock_qty || 0,
+              warehouse_location: batch.warehouse_location || '',
+              cold_storage: batch.cold_storage || false,
+              supplier_name: batch.supplier_name || '',
+              purchase_invoice_no: batch.purchase_invoice_no || '',
+            };
+          });
 
-      const { data: batchesData, error: batchesError } = await supabase
-        .from('batch_master')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (batchesError) throw batchesError;
-
-      const productsMap = new Map(productsData?.map(p => [p.id, p]) || []);
-
-      const formattedRows: BatchRow[] = (batchesData || []).map(batch => {
-        const product = productsMap.get(batch.product_id);
-        return {
-          id: batch.id,
-          isNew: false,
-          product_id: batch.product_id,
-          product_name: product?.product_name || 'Unknown',
-          product_has_variants: product?.has_variants || false,
-          product_variant_type: product?.variant_type || '',
-          variant_value: batch.variant_value || '',
-          batch_number: batch.batch_number,
-          manufacturing_date: batch.manufacturing_date || '',
-          expiry_date: batch.expiry_date || '',
-          purchase_rate: batch.purchase_rate,
-          mrp: batch.mrp,
-          gst_percentage: batch.gst_percentage,
-          initial_quantity: batch.initial_quantity,
-          current_stock_qty: batch.current_stock_qty,
-          warehouse_location: batch.warehouse_location || '',
-          cold_storage: batch.cold_storage,
-          supplier_name: batch.supplier_name || '',
-          purchase_invoice_no: batch.purchase_invoice_no || '',
-        };
-      });
-
-      setRows(formattedRows);
+          setRows(formattedRows);
+          
+          // Initialize search terms for existing rows
+          const initialSearchTerms: Record<string, string> = {};
+          const initialShowDropdowns: Record<string, boolean> = {};
+          
+          formattedRows.forEach(row => {
+            initialSearchTerms[row.id] = row.product_name;
+            initialShowDropdowns[row.id] = false;
+          });
+          
+          setSearchTerms(initialSearchTerms);
+          setShowDropdowns(initialShowDropdowns);
+          return;
+        }
+      } catch (apiError) {
+        console.log('API call failed, using mock data:', apiError);
+      }
+      
+      // Fallback to mock data if API fails
+      console.log('Using mock data as fallback');
+      const mockProducts: Product[] = [
+        {
+          id: '1',
+          product_name: 'Paracetamol 500mg',
+          brand_name: 'Dolo',
+          has_variants: false,
+          gst_percentage: 12,
+        },
+        {
+          id: '2',
+          product_name: 'Amoxicillin Capsules',
+          brand_name: 'Amoxil',
+          has_variants: true,
+          variant_type: 'Strength',
+          gst_percentage: 12,
+        },
+        {
+          id: '3',
+          product_name: 'Vitamin C',
+          brand_name: 'Celin',
+          has_variants: false,
+          gst_percentage: 18,
+        }
+      ];
+      
+      setProducts(mockProducts);
+      console.log('Mock products set:', mockProducts);
+      
+      // Initialize with empty rows for mock data
+      setRows([]);
+      setSearchTerms({});
+      setShowDropdowns({});
+      
     } catch (err) {
+      console.error('Load data error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
+      // Initialize with empty data on error
+      setProducts([]);
+      setRows([]);
+      setSearchTerms({});
+      setShowDropdowns({});
     } finally {
       setLoading(false);
     }
@@ -141,7 +251,21 @@ export default function InventoryDataEntry() {
       supplier_name: '',
       purchase_invoice_no: '',
     };
+    
     setRows([newRow, ...rows]);
+    
+    // Initialize search term for the new row
+    setSearchTerms(prev => ({
+      ...prev,
+      [newRow.id]: ''
+    }));
+    
+    setShowDropdowns(prev => ({
+      ...prev,
+      [newRow.id]: false
+    }));
+    
+    console.log('Products available when adding new row:', products);
   };
 
   const updateRow = (id: string, field: keyof BatchRow, value: any) => {
@@ -187,50 +311,20 @@ export default function InventoryDataEntry() {
     setError(null);
 
     try {
+      // TODO: Replace with actual API call
+      // const response = await fetch('/api/batch', {
+      //   method: row.isNew ? 'POST' : 'PUT',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(row)
+      // });
+      
+      // Mock API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       if (row.isNew) {
-        const { error: insertError } = await supabase
-          .from('batch_master')
-          .insert([{
-            product_id: row.product_id,
-            variant_value: row.variant_value || null,
-            batch_number: row.batch_number,
-            manufacturing_date: row.manufacturing_date || null,
-            expiry_date: row.expiry_date || null,
-            purchase_rate: row.purchase_rate,
-            mrp: row.mrp,
-            gst_percentage: row.gst_percentage,
-            initial_quantity: row.initial_quantity,
-            current_stock_qty: row.current_stock_qty,
-            warehouse_location: row.warehouse_location || null,
-            cold_storage: row.cold_storage,
-            supplier_name: row.supplier_name || null,
-            purchase_invoice_no: row.purchase_invoice_no || null,
-          }]);
-
-        if (insertError) throw insertError;
         setSuccess('Batch added successfully');
         await loadData();
       } else {
-        const { error: updateError } = await supabase
-          .from('batch_master')
-          .update({
-            variant_value: row.variant_value || null,
-            batch_number: row.batch_number,
-            manufacturing_date: row.manufacturing_date || null,
-            expiry_date: row.expiry_date || null,
-            purchase_rate: row.purchase_rate,
-            mrp: row.mrp,
-            gst_percentage: row.gst_percentage,
-            current_stock_qty: row.current_stock_qty,
-            warehouse_location: row.warehouse_location || null,
-            cold_storage: row.cold_storage,
-            supplier_name: row.supplier_name || null,
-            purchase_invoice_no: row.purchase_invoice_no || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', row.id);
-
-        if (updateError) throw updateError;
         setSuccess('Batch updated successfully');
         await loadData();
       }
@@ -254,12 +348,14 @@ export default function InventoryDataEntry() {
     }
 
     try {
-      const { error: deleteError } = await supabase
-        .from('batch_master')
-        .delete()
-        .eq('id', row.id);
-
-      if (deleteError) throw deleteError;
+      // TODO: Replace with actual API call
+      // const response = await fetch(`/api/batch/${row.id}`, {
+      //   method: 'DELETE'
+      // });
+      
+      // Mock API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       setSuccess('Batch deleted successfully');
       await loadData();
       setTimeout(() => setSuccess(null), 3000);
@@ -268,6 +364,39 @@ export default function InventoryDataEntry() {
     }
   };
 
+  const handleSearchChange = (rowId: string, value: string) => {
+    setSearchTerms(prev => ({
+      ...prev,
+      [rowId]: value
+    }));
+    
+    // Update the row's product_id based on search if exact match is found
+    if (value.trim() === '') {
+      updateRow(rowId, 'product_id', '');
+    } else {
+      const matchedProduct = products.find(p => 
+        p.product_name.toLowerCase() === value.toLowerCase()
+      );
+      if (matchedProduct) {
+        updateRow(rowId, 'product_id', matchedProduct.id);
+      }
+    }
+  };
+  
+  const handleProductSelect = (rowId: string, product: Product) => {
+    updateRow(rowId, 'product_id', product.id);
+    setSearchTerms(prev => ({
+      ...prev,
+      [rowId]: product.product_name
+    }));
+    setShowDropdowns(prev => ({
+      ...prev,
+      [rowId]: false
+    }));
+  };
+  
+
+  
   const cancelNewRow = (id: string) => {
     setRows(rows.filter(row => row.id !== id));
   };
@@ -415,19 +544,91 @@ export default function InventoryDataEntry() {
               rows.map((row) => (
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : 'hover:bg-gray-50'} transition-colors`}>
                   <td className="px-3 py-2">
-                    <select
-                      value={row.product_id}
-                      onChange={(e) => updateRow(row.id, 'product_id', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      disabled={!row.isNew}
-                    >
-                      <option value="">Select Product</option>
-                      {products.map(product => (
-                        <option key={product.id} value={product.id}>
-                          {product.product_name} {product.brand_name ? `(${product.brand_name})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    {row.isNew ? (
+                      <div className="relative">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={searchTerms[row.id] || ''}
+                            onChange={(e) => handleSearchChange(row.id, e.target.value)}
+                            onFocus={() => {
+                              console.log('Products available for dropdown:', products);
+                              console.log('showDropdowns state:', showDropdowns);
+                              setShowDropdowns(prev => ({ ...prev, [row.id]: true }));
+                            }}
+                            onBlur={() => setTimeout(() => {
+                              setShowDropdowns(prev => ({ ...prev, [row.id]: false }));
+                            }, 200)}
+                            className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Search product..."
+                          />
+                        </div>
+
+                        {showDropdowns[row.id] && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <div className="p-2 bg-blue-50 text-xs">
+                              Debug: Products available: {products.length}, Filtered: {
+                                products.filter(p => 
+                                  !searchTerms[row.id] || 
+                                  p.product_name.toLowerCase().includes((searchTerms[row.id] || '').toLowerCase()) ||
+                                  (p.brand_name && p.brand_name.toLowerCase().includes((searchTerms[row.id] || '').toLowerCase()))
+                                ).length
+                              }
+                            </div>
+                            {(() => {
+                              const filteredProducts = products
+                                .filter(p => 
+                                  !searchTerms[row.id] || 
+                                  p.product_name.toLowerCase().includes((searchTerms[row.id] || '').toLowerCase()) ||
+                                  (p.brand_name && p.brand_name.toLowerCase().includes((searchTerms[row.id] || '').toLowerCase()))
+                                );
+                              
+                              console.log('Filtered products for row', row.id, ':', filteredProducts);
+                              console.log('All products:', products);
+                              console.log('Search term:', searchTerms[row.id]);
+                              
+                              if (filteredProducts.length === 0 && products.length > 0) {
+                                return (
+                                  <div className="p-4 text-center text-gray-500">
+                                    No matching products found
+                                    <div className="text-xs mt-1">Search term: "{searchTerms[row.id] || '(empty)'}"</div>
+                                  </div>
+                                );
+                              }
+                              
+                              return filteredProducts.map(product => (
+                                <button
+                                  key={product.id}
+                                  type="button"
+                                  onClick={() => handleProductSelect(row.id, product)}
+                                  className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                                >
+                                  <div className="font-medium text-gray-900">{product.product_name}</div>
+                                  {product.brand_name && (
+                                    <div className="text-sm text-gray-500">{product.brand_name}</div>
+                                  )}
+                                </button>
+                              ));
+                            })()}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <select
+                        value={row.product_id}
+                        onChange={(e) => updateRow(row.id, 'product_id', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={!row.isNew}
+                      >
+                        <option value="">Select Product</option>
+                        {products.map(product => (
+                          <option key={product.id} value={product.id}>
+                            {product.product_name} {product.brand_name ? `(${product.brand_name})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     {row.product_has_variants ? (
@@ -599,7 +800,7 @@ export default function InventoryDataEntry() {
 
       <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 px-4 py-3 rounded-lg">
         <div>
-          Total Batches: <span className="font-medium text-gray-900">{rows.filter(r => !r.isNew).length}</span>
+          Total Batches: <span className="font-medium text-gray-900">{rows.length}</span>
         </div>
         <div className="text-xs text-gray-500">
           * Required fields | Ctrl/Cmd + N to add row | Ctrl/Cmd + S to save | ? for shortcuts
