@@ -15,6 +15,7 @@ interface BatchRow {
   isNew: boolean;
   product_id: string;
   product_name: string;
+  product_brand: string;
   product_has_variants: boolean;
   product_variant_type: string;
   variant_name: string;
@@ -97,6 +98,7 @@ export default function InventoryDataEntry() {
         isNew: true,
         product_id: '',
         product_name: '',
+        product_brand: '',
         product_has_variants: false,
         product_variant_type: '',
         variant_name: '',
@@ -122,6 +124,7 @@ export default function InventoryDataEntry() {
       isNew: true,
       product_id: '',
       product_name: '',
+      product_brand: '',
       product_has_variants: false,
       product_variant_type: '',
       variant_name: '',
@@ -144,6 +147,7 @@ export default function InventoryDataEntry() {
           const product = products.find(p => p.id === value);
           if (product) {
             updated.product_name = product.product_name;
+            updated.product_brand = product.brand_name || '';
             updated.product_has_variants = product.has_variants;
             updated.product_variant_type = product.variant_type || '';
             if (!product.has_variants) {
@@ -303,6 +307,9 @@ export default function InventoryDataEntry() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0">
             <tr>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
+                Brand
+              </th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]">
                 Product *
               </th>
@@ -332,7 +339,7 @@ export default function InventoryDataEntry() {
           <tbody className="bg-white divide-y divide-gray-200">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <div className="text-lg font-medium">No inventory data yet</div>
                     <p className="text-sm">Click "Add New Row" or press Ctrl/Cmd + N to start adding inventory</p>
@@ -342,6 +349,61 @@ export default function InventoryDataEntry() {
             ) : (
               rows.map((row) => (
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : 'hover:bg-gray-50'} transition-colors`}>
+                  <td className="px-3 py-2">
+                    {row.isNew ? (
+                      <ReactSelect
+                        value={row.product_brand ? { value: row.product_brand, label: row.product_brand } : null}
+                        onChange={(selectedOption: { value: string; label: string } | null) => {
+                          if (selectedOption) {
+                            updateRow(row.id, 'product_brand', selectedOption.value);
+                          } else {
+                            updateRow(row.id, 'product_brand', '');
+                          }
+                        }}
+                        options={Array.from(new Set(products.map(p => p.brand_name).filter(Boolean)))
+                          .map(brand => ({
+                            value: brand!, 
+                            label: brand!
+                          }))}
+                        placeholder="Search brand..."
+                        className="text-sm"
+                        menuPortalTarget={document.body}
+                        styles={{
+                          control: (provided) => ({
+                            ...provided,
+                            minWidth: 200,
+                            minHeight: 36,
+                          }),
+                          menuPortal: (provided) => ({
+                            ...provided,
+                            zIndex: 9999,
+                          }),
+                          valueContainer: (provided) => ({
+                            ...provided,
+                            paddingLeft: 8,
+                            paddingRight: 8,
+                          }),
+                        }}
+                        isSearchable
+                        closeMenuOnSelect={true}
+                        blurInputOnSelect={true}
+                      />
+                    ) : (
+                      <select
+                        value={row.product_brand}
+                        onChange={(e) => updateRow(row.id, 'product_brand', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={!row.isNew}
+                      >
+                        <option value="">Select Brand</option>
+                        {Array.from(new Set(products.map(p => p.brand_name).filter(Boolean))).map(brand => (
+                          <option key={brand} value={brand!}>
+                            {brand}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     {row.isNew ? (
                       <ReactSelect
