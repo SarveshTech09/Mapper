@@ -2,92 +2,78 @@ import { useEffect } from 'react';
 import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
 import Dashboard from './components/Dashboard';
+import InventoryDataEntry from './components/InventoryDataEntry';
+import ProductDataEntry from './components/ProductDataEntry';
+import InventoryDashboard from './components/InventoryDashboard';
 import { useAuth } from './context/AuthProvider';
 
-// Protected Route Component
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { token, loading } = useAuth();
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4" />
+        <p className="text-gray-600">Loading...</p>
       </div>
-    );
-  }
-  
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return children;
+    </div>
+  );
+}
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { token } = useAuth();
+  return token ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function App() {
   const { token, logout, loading, initialized } = useAuth();
   const navigate = useNavigate();
 
-  // Fetch user profile on token change
   useEffect(() => {
-    console.log('App: Token changed to:', token);
-    if (token) {
-      const fetchUserProfile = async () => {
-        try {
-          console.log('App: Fetching user profile with token:', token.substring(0, 20) + '...');
-          const response = await fetch(`${import.meta.env.VITE_BASE_URL}/api/me`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
+    if (!token) return;
 
-          if (response.ok) {
-            const data = await response.json();
-            console.log('User profile fetched:', data);
-          } else {
-            console.error('Failed to fetch user profile:', response.status);
-            // If token is invalid, logout the user
-            if (response.status === 401) {
-              console.log('Token is invalid, logging out');
-              logout();
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching user profile:', error);
+    const validateToken = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BASE_URL}/api/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.status === 401) {
+          console.warn('App: token rejected by server — logging out');
+          logout();
         }
-      };
+      } catch (error) {
+        console.error('App: error validating token:', error);
+      }
+    };
 
-      fetchUserProfile();
-    }
+    validateToken();
   }, [token, logout]);
 
-  const handleLoginSuccess = () => {
-    // Navigate to dashboard after successful login
-    navigate('/');
-  };
+  if (loading || !initialized) return <LoadingScreen />;
 
-  // Show loading state while checking auth
-  if (loading || !initialized) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleLoginSuccess = () => navigate('/');
 
   return (
     <Routes>
-      <Route path="/login" element={!token ? <LoginPage onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/" replace />} />
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/inventory" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/products" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route
+        path="/login"
+        element={token ? <Navigate to="/" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />}
+      />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<InventoryDashboard />} />
+        <Route path="inventory" element={<InventoryDataEntry />} />
+        <Route path="products" element={<ProductDataEntry />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
