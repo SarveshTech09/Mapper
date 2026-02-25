@@ -26,7 +26,6 @@ interface ProductRow {
   gst_percentage: number | '';
   inventory_selling: boolean;
   description: string;
-  employee_percentage: number;
   has_variants: boolean;
   variant_type: string;
   status: string;
@@ -75,7 +74,6 @@ export default function ProductDataEntry() {
         gst_percentage: '', 
         inventory_selling: false, 
         description: '', 
-        employee_percentage: 0, 
         has_variants: false, 
         variant_type: '', 
         status: 'active',
@@ -100,7 +98,6 @@ export default function ProductDataEntry() {
       gst_percentage: '',
       inventory_selling: false,
       description: '',
-      employee_percentage: 0,
       has_variants: false,
       variant_type: '',
       status: 'active',
@@ -247,6 +244,20 @@ export default function ProductDataEntry() {
     setRows(rows.filter(row => row.id !== id));
   };
 
+  const saveAllRows = async () => {
+    setError(null);
+    setSuccess(null);
+    
+    const rowsToSave = rows.filter(row => row.product_name.trim() !== '');
+    if (rowsToSave.length === 0) {
+      setError('No valid products to save');
+      return;
+    }
+    for (const row of rowsToSave) {
+      await saveRow(row);
+    }
+  };
+
   if (userLoading || categoriesLoading || brandsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -282,13 +293,23 @@ export default function ProductDataEntry() {
           <h2 className="text-2xl font-bold text-gray-900">Product Master Data Entry</h2>
           <p className="text-gray-600 mt-1">Add and manage products directly in the grid</p>
         </div>
-        <button
-          onClick={addNewRow}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          <Plus className="w-5 h-5" />
-          Add New Product
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={addNewRow}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            <Plus className="w-5 h-5" />
+            Add New Product
+          </button>
+          <button
+            onClick={saveAllRows}
+            disabled={rows.some(row => saving === row.id)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
+          >
+            <Save className="w-5 h-5" />
+            Submit All
+          </button>
+        </div>
       </div>
 
 
@@ -321,9 +342,8 @@ export default function ProductDataEntry() {
                 { key: 'image', label: 'Image', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[160px]' },
                 { key: 'prescription', label: 'Prescription', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[110px]' },
                 { key: 'hsn_code', label: 'HSN No', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
-                { key: 'gst_percentage', label: 'GST', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[80px]' },
+                { key: 'gst_percentage', label: 'GST %', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[80px]' },
                 { key: 'description', label: 'Description', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[180px]' },
-                { key: 'employee_percentage', label: 'Employee %', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[110px]' },
                 { key: 'inventory_selling', label: 'Inventory Selling', className: 'px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
                 { key: 'actions', label: 'Actions', className: 'px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]' },
               ].map((header) => (
@@ -339,7 +359,7 @@ export default function ProductDataEntry() {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={12} className="px-6 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <div className="text-lg font-medium">No products found</div>
                     <p className="text-sm">Click "Add New Product" to start adding products</p>
@@ -556,17 +576,7 @@ export default function ProductDataEntry() {
                       placeholder="Description"
                     />
                   </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.employee_percentage}
-                      onChange={(e) => updateRow(row.id, 'employee_percentage', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      min="0"
-                      max="100"
-                    />
-                  </td>
+
                   <td className="px-3 py-2 text-center">
                     <input
                       type="checkbox"
