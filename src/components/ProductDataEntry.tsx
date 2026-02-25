@@ -18,19 +18,15 @@ interface ProductRow {
   isNew: boolean;
   product_name: string;
   brand_name: string;
-  generic_name: string;
   category: string;
   sub_category: string;
-  dosage_form: string;
-  strength: string;
-  base_pack_size: string;
+  image: File | null;
+  prescription: string;
   hsn_code: string;
-  gst_percentage: number;
-  schedule_type: string;
-  prescription_required: boolean;
-  storage_condition: string;
-  manufacturer: string;
-  barcode: string;
+  gst_percentage: number | '';
+  inventory_selling: boolean;
+  description: string;
+  employee_percentage: number;
   has_variants: boolean;
   variant_type: string;
   status: string;
@@ -71,19 +67,15 @@ export default function ProductDataEntry() {
         isNew: true, 
         product_name: '', 
         brand_name: '', 
-        generic_name: '', 
         category: '', 
         sub_category: '', 
-        dosage_form: '', 
-        strength: '', 
-        base_pack_size: '', 
+        image: null, 
+        prescription: '', 
         hsn_code: '', 
-        gst_percentage: 12, 
-        schedule_type: '', 
-        prescription_required: false, 
-        storage_condition: '', 
-        manufacturer: '', 
-        barcode: '', 
+        gst_percentage: '', 
+        inventory_selling: false, 
+        description: '', 
+        employee_percentage: 0, 
         has_variants: false, 
         variant_type: '', 
         status: 'active',
@@ -100,19 +92,15 @@ export default function ProductDataEntry() {
       isNew: true,
       product_name: '',
       brand_name: '',
-      generic_name: '',
       category: '',
       sub_category: '',
-      dosage_form: '',
-      strength: '',
-      base_pack_size: '',
+      image: null,
+      prescription: '',
       hsn_code: '',
-      gst_percentage: 12,
-      schedule_type: '',
-      prescription_required: false,
-      storage_condition: '',
-      manufacturer: '',
-      barcode: '',
+      gst_percentage: '',
+      inventory_selling: false,
+      description: '',
+      employee_percentage: 0,
       has_variants: false,
       variant_type: '',
       status: 'active',
@@ -328,19 +316,15 @@ export default function ProductDataEntry() {
               {[
                 { key: 'brand_name', label: 'Brand Name', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
                 { key: 'product_name', label: 'Product Name *', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]' },
-                { key: 'generic_name', label: 'Generic Name', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
                 { key: 'category', label: 'Category', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
                 { key: 'sub_category', label: 'Sub Category', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
-                { key: 'dosage_form', label: 'Dosage Form', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
-                { key: 'strength', label: 'Strength', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
-                { key: 'base_pack_size', label: 'Pack Size', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
-                { key: 'hsn_code', label: 'HSN Code', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
-                { key: 'gst_percentage', label: 'GST %', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[80px]' },
-                { key: 'schedule_type', label: 'Schedule', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
-                { key: 'storage_condition', label: 'Storage', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
-                { key: 'manufacturer', label: 'Manufacturer', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' },
-                { key: 'barcode', label: 'Barcode', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
-                { key: 'prescription_required', label: 'Rx Req', className: 'px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[80px]' },
+                { key: 'image', label: 'Image', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[160px]' },
+                { key: 'prescription', label: 'Prescription', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[110px]' },
+                { key: 'hsn_code', label: 'HSN No', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]' },
+                { key: 'gst_percentage', label: 'GST', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[80px]' },
+                { key: 'description', label: 'Description', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[180px]' },
+                { key: 'employee_percentage', label: 'Employee %', className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[110px]' },
+                { key: 'inventory_selling', label: 'Inventory Selling', className: 'px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]' },
                 { key: 'actions', label: 'Actions', className: 'px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]' },
               ].map((header) => (
                 <th 
@@ -355,7 +339,7 @@ export default function ProductDataEntry() {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={16} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={13} className="px-6 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <div className="text-lg font-medium">No products found</div>
                     <p className="text-sm">Click "Add New Product" to start adding products</p>
@@ -427,15 +411,6 @@ export default function ProductDataEntry() {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.generic_name}
-                      onChange={(e) => updateRow(row.id, 'generic_name', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Generic"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
                     <ReactSelect
                       value={row.category ? { value: row.category, label: row.category } : null}
                       onChange={(selectedOption: OptionType | null) => {
@@ -499,31 +474,57 @@ export default function ProductDataEntry() {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.dosage_form}
-                      onChange={(e) => updateRow(row.id, 'dosage_form', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Form"
-                    />
+                    <label
+                      className={`flex flex-row items-center justify-center w-full h-[36px] border-2 border-dashed rounded cursor-pointer transition-colors gap-1.5 px-2 ${row.image ? 'border-green-400 bg-green-50 hover:bg-green-100' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'}`}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const file = e.dataTransfer.files[0];
+                        if (!file) return;
+                        if (!['image/jpeg', 'image/png'].includes(file.type)) { alert('Only JPG / PNG allowed'); return; }
+                        if (file.size > 1 * 1024 * 1024) { alert('Max size is 1 MB'); return; }
+                        updateRow(row.id, 'image', file);
+                        setSuccess('Image uploaded successfully');
+                        setTimeout(() => setSuccess(null), 3000);
+                      }}
+                    >
+                      {row.image ? (
+                        <>
+                          <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                          <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth={1.5} /><circle cx="8.5" cy="8.5" r="1.5" strokeWidth={1.5} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 15l-5-5L5 21" /></svg>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4-4m0 0l4 4m-4-4v9M20 16l-4-4m0 0l-4 4m4-4V3" /></svg>
+                          <span className="text-[11px] text-gray-500">Click or drag image</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (!['image/jpeg', 'image/png'].includes(file.type)) { alert('Only JPG / PNG allowed'); return; }
+                          if (file.size > 1 * 1024 * 1024) { alert('Max size is 1 MB'); return; }
+                          updateRow(row.id, 'image', file);
+                          setSuccess('Image uploaded successfully');
+                          setTimeout(() => setSuccess(null), 3000);
+                        }}
+                      />
+                    </label>
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.strength}
-                      onChange={(e) => updateRow(row.id, 'strength', e.target.value)}
+                    <select
+                      value={row.prescription}
+                      onChange={(e) => updateRow(row.id, 'prescription', e.target.value)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Strength"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.base_pack_size}
-                      onChange={(e) => updateRow(row.id, 'base_pack_size', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Pack Size"
-                    />
+                    >
+                      <option value="" disabled>Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
                   </td>
                   <td className="px-3 py-2">
                     <input
@@ -537,57 +538,40 @@ export default function ProductDataEntry() {
                   <td className="px-3 py-2">
                     <select
                       value={row.gst_percentage}
-                      onChange={(e) => updateRow(row.id, 'gst_percentage', parseFloat(e.target.value))}
+                      onChange={(e) => updateRow(row.id, 'gst_percentage', e.target.value === '' ? '' : parseFloat(e.target.value))}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="0">0%</option>
-                      <option value="5">5%</option>
-                      <option value="12">12%</option>
-                      <option value="18">18%</option>
-                      <option value="28">28%</option>
+                      <option value="" disabled>Select</option>
+                      <option value="5">5</option>
+                      <option value="12">12</option>
+                      <option value="18">18</option>
                     </select>
                   </td>
                   <td className="px-3 py-2">
                     <input
                       type="text"
-                      value={row.schedule_type}
-                      onChange={(e) => updateRow(row.id, 'schedule_type', e.target.value)}
+                      value={row.description}
+                      onChange={(e) => updateRow(row.id, 'description', e.target.value)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Schedule"
+                      placeholder="Description"
                     />
                   </td>
                   <td className="px-3 py-2">
                     <input
-                      type="text"
-                      value={row.storage_condition}
-                      onChange={(e) => updateRow(row.id, 'storage_condition', e.target.value)}
+                      type="number"
+                      value={row.employee_percentage}
+                      onChange={(e) => updateRow(row.id, 'employee_percentage', parseFloat(e.target.value) || 0)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Storage"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.manufacturer}
-                      onChange={(e) => updateRow(row.id, 'manufacturer', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Manufacturer"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.barcode}
-                      onChange={(e) => updateRow(row.id, 'barcode', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Barcode"
+                      placeholder="0"
+                      min="0"
+                      max="100"
                     />
                   </td>
                   <td className="px-3 py-2 text-center">
                     <input
                       type="checkbox"
-                      checked={row.prescription_required}
-                      onChange={(e) => updateRow(row.id, 'prescription_required', e.target.checked)}
+                      checked={row.inventory_selling}
+                      onChange={(e) => updateRow(row.id, 'inventory_selling', e.target.checked)}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                   </td>
