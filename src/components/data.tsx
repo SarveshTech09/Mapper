@@ -19,7 +19,7 @@ export const dummyData = [
   {
     type: "text",
     required: true,
-    label: "Title",
+    label: "Product Name ",
     className: "form-control",
     name: "title",
     access: false,
