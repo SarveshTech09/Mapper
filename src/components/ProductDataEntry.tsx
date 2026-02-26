@@ -56,7 +56,7 @@ interface FieldType {
 }
 
 // Helper function to render field based on its type
-const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, field: keyof ProductRow, value: string | number | boolean) => Promise<void>, rowIndex: number) => {
+const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, field: string, value: string | number | boolean) => Promise<void>, rowIndex: number, setSuccess: (msg: string | null) => void) => {
   const fieldName = field.name as keyof ProductRow;
   const value = row[fieldName];
   
@@ -158,28 +158,118 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
         </div>
       );
     
-    case 'file':
+    case 'file': {
+      const hasImage = value && typeof value === 'string' && value.length > 0;
       return (
-        <div className="flex items-center">
+        <label
+          className={`flex flex-row items-center justify-center w-full h-[36px] border-2 border-dashed rounded cursor-pointer transition-colors gap-1.5 px-2 ${hasImage ? "border-green-400 bg-green-50 hover:bg-green-100" : "border-gray-300 hover:border-blue-400 hover:bg-blue-50"}`}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            if (!["image/jpeg", "image/png"].includes(file.type)) {
+              alert("Only JPG / PNG allowed");
+              return;
+            }
+            if (file.size > 1 * 1024 * 1024) {
+              alert("Max size is 1 MB");
+              return;
+            }
+            // For now, just store the filename
+            updateRow(row.id, fieldName, file.name);
+            setSuccess("Image uploaded successfully");
+            setTimeout(() => setSuccess(null), 3000);
+          }}
+        >
+          {hasImage ? (
+            <>
+              <svg
+                className="w-4 h-4 text-green-500 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              <svg
+                className="w-4 h-4 text-green-600 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <rect
+                  x="3"
+                  y="3"
+                  width="18"
+                  height="18"
+                  rx="2"
+                  ry="2"
+                  strokeWidth={1.5}
+                />
+                <circle
+                  cx="8.5"
+                  cy="8.5"
+                  r="1.5"
+                  strokeWidth={1.5}
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M21 15l-5-5L5 21"
+                />
+              </svg>
+            </>
+          ) : (
+            <>
+              <svg
+                className="w-4 h-4 text-gray-400 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 16l4-4m0 0l4 4m-4-4v9M20 16l-4-4m0 0l-4 4m4-4V3"
+                />
+              </svg>
+              <span className="text-[11px] text-gray-500">
+                Click or drag image
+              </span>
+            </>
+          )}
           <input
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png"
+            className="sr-only"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) {
-                // Handle file upload here - for now we'll just store the filename
-                updateRow(row.id, fieldName, file.name);
+              if (!file) return;
+              if (!["image/jpeg", "image/png"].includes(file.type)) {
+                alert("Only JPG / PNG allowed");
+                return;
               }
+              if (file.size > 1 * 1024 * 1024) {
+                alert("Max size is 1 MB");
+                return;
+              }
+              // For now, just store the filename
+              updateRow(row.id, fieldName, file.name);
+              setSuccess("Image uploaded successfully");
+              setTimeout(() => setSuccess(null), 3000);
             }}
-            className="w-full px-2 py-1.5 text-sm"
           />
-          {value && (
-            <span className="ml-2 text-xs text-gray-500 truncate max-w-[80px]" title={value as string}>
-              {(value as string).substring(0, 15)}...
-            </span>
-          )}
-        </div>
+        </label>
       );
+    }
     
     default:
       return (
@@ -347,19 +437,18 @@ export default function ProductDataEntry() {
     setRows([newRow, ...rows]);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateRow = async (id: string, field: keyof ProductRow, value: any) => {
+  const updateRow = async (id: string, field: string, value: string | number | boolean) => {
     if (field === 'category' && businessId) {
       // Update the category first
       setRows(prev => 
         prev.map(row =>
-          row.id === id ? { ...row, [field]: value } : row
+          row.id === id ? { ...row, [field]: value as string } : row
         )
       );
       
       // Fetch and update subcategories for this specific row
       if (value) {  // Only fetch if category is not empty
-        const subCategories = await fetchSubCategories(businessId, value);
+        const subCategories = await fetchSubCategories(businessId, value as string);
         
         setRows(prev => 
           prev.map(row => {
@@ -385,13 +474,13 @@ export default function ProductDataEntry() {
       // Update the brand name first
       setRows(prev => 
         prev.map(row =>
-          row.id === id ? { ...row, [field]: value } : row
+          row.id === id ? { ...row, [field]: value as string } : row
         )
       );
       
       // Fetch and update products for this specific row if brand is selected
       if (value) {  // Only fetch if brand is not empty
-        const brandName = value;
+        const brandName = value as string;
           const rowBrandKey = `${id}-${brandName}`;
           
           // Set loading state for this specific row
@@ -576,7 +665,7 @@ export default function ProductDataEntry() {
                   {dummyData
                     .map((field) => (
                       <td key={field.name} className="px-3 py-2">
-                        {renderField(field, row, updateRow, rowIndex)}
+                        {renderField(field, row, updateRow, rowIndex, setSuccess)}
                       </td>
                     ))}
                   <td className="px-3 py-2 text-center sticky right-0 bg-white">
