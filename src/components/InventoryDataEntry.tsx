@@ -282,7 +282,7 @@ export default function InventoryDataEntry() {
     try {
       // Prepare the payload for useSubmitVariant
       const variantData = {
-        product_name: row.product_name,
+        product_name: row.variant_name || row.product_name,
         uom: row.uom,
         value: row.value,
         mrp: row.price.toString(),
@@ -374,7 +374,7 @@ export default function InventoryDataEntry() {
       try {
         // Prepare the payload for useSubmitVariant
         const variantData = {
-          product_name: row.product_name,
+          product_name: row.variant_name || row.product_name,
           uom: row.uom,
           value: row.value,
           mrp: row.price.toString(),
