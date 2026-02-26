@@ -6,6 +6,7 @@ import { useCategories } from '../hooks/useCategories';
 import { useSubCategories } from '../hooks/useSubCategories';
 import useBrands from '../hooks/useBrands';
 import useProductsByBrand from '../hooks/useProductsByBrand';
+import useAddProducts from '../hooks/useAddProducts';
 import { dummyData } from './data';
 
 // Define the Option type for react-select
@@ -63,7 +64,8 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
     'brand': 'brand_name',
     'title': 'product_name',
     'hsn_no': 'hsn_code',
-    'description': 'generic_name'
+    'description': 'generic_name',
+    'gst_percentage': 'gst_percentage'
   };
 
   const fieldName = (fieldMapping[field.name] || field.name) as keyof ProductRow;
@@ -157,6 +159,8 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
           <ReactSelect
             value={value ? { value: value as string, label: value as string } : null}
             onChange={(selectedOption: OptionType | null) => {
+              // For gst_percentage, we need to pass the raw value (with %) to updateRow
+              // which will then convert it to a number
               updateRow(row.id, fieldName, selectedOption?.value || '');
             }}
             options={options}
@@ -177,7 +181,7 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
             isSearchable
             isDisabled={field.name === 'sub_category' && (!row.availableSubCategories || row.availableSubCategories.length === 0)}
           />
-        ); 
+        );
       }
 
     case 'autocomplete':
@@ -464,6 +468,9 @@ export default function ProductDataEntry() {
 
   // Fetch products by brand using custom hook
   const { productsError, fetchProducts } = useProductsByBrand();
+  
+  // Use add products hook for API submission
+  const { addProducts, loading: addProductsLoading, error: addProductsError } = useAddProducts();
 
 
 
@@ -622,6 +629,15 @@ export default function ProductDataEntry() {
         // Clear loading state for this row
         setRowLoadingMap(prev => ({ ...prev, [id]: false }));
       }
+    } else if (field === 'gst_percentage') {
+      // Special handling for gst_percentage to convert string to number
+      const numericValue = typeof value === 'string' ? 
+        parseFloat(value.replace('%', '')) || 0 : 
+        typeof value === 'number' ? value : 0;
+      
+      setRows(rows.map(row =>
+        row.id === id ? { ...row, [field]: numericValue } : row
+      ));
     } else {
       // For other fields, just update normally
       setRows(rows.map(row =>
@@ -631,33 +647,77 @@ export default function ProductDataEntry() {
   };
 
   const saveRow = async (row: ProductRow) => {
-    if (!row.product_name) {
+    // Validate required fields
+    if (!row.product_name?.trim()) {
       setError('Product Name is required');
+      return;
+    }
+    if (!row.brand_name?.trim()) {
+      setError('Brand is required');
+      return;
+    }
+    if (!row.category?.trim()) {
+      setError('Category is required');
+      return;
+    }
+    if (!row.sub_category?.trim()) {
+      setError('Sub-category is required');
       return;
     }
 
     setSaving(row.id);
     setError(null);
+    setSuccess(null);
 
     try {
-      // Simulate save operation (removed Supabase calls)
-      if (row.isNew) {
-        // Add new row to state
-        const newRows = rows.map(r => 
-          r.id === row.id ? { ...row, isNew: false } : r
-        );
-        setRows(newRows);
-        setSuccess('Product added successfully');
-      } else {
-        // Update existing row
-        const newRows = rows.map(r => 
-          r.id === row.id ? { ...row } : r
-        );
-        setRows(newRows);
-        setSuccess('Product updated successfully');
+      // Transform row data to match API requirements
+      // Handle image conversion - if it's a string (base64), convert to File
+      let imageFile: File | null = null;
+      if (row.image instanceof File) {
+        imageFile = row.image;
+      } else if (typeof row.image === 'string' && row.image.startsWith('data:')) {
+        // Convert base64 string to File
+        const base64String = row.image;
+        const byteString = atob(base64String.split(',')[1]);
+        const mimeString = base64String.split(',')[0].split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        imageFile = new File([ab], 'product-image.jpg', { type: mimeString });
       }
 
-      setTimeout(() => setSuccess(null), 3000);
+      const productData: Parameters<typeof addProducts>[0][0] = {
+        title: row.product_name,
+        brand: row.brand_name,
+        category: row.category,
+        description: row.generic_name || '',
+        gst_percentage: row.gst_percentage || 0,
+        has_variants: row.has_variants ? 1 : 0,
+        hsn_no: row.hsn_code || '',
+        image: imageFile,
+        is_inventory: 1, // Default to inventory selling enabled
+        prescription_required: row.prescription_required ? 1 : 0,
+        sub_category: row.sub_category,
+      };
+
+      // Submit to API
+      const success = await addProducts([productData]);
+      
+      if (success) {
+        // Update local state to mark as saved
+        if (row.isNew) {
+          const newRows = rows.map(r => 
+            r.id === row.id ? { ...row, isNew: false } : r
+          );
+          setRows(newRows);
+        }
+        setSuccess('Product saved successfully');
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError(addProductsError || 'Failed to save product');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save product');
     } finally {
@@ -778,7 +838,7 @@ export default function ProductDataEntry() {
                     <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={() => saveRow(row)}
-                        disabled={saving === row.id}
+                        disabled={saving === row.id || addProductsLoading}
                         className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
                         title="Save"
                       >

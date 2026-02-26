@@ -5,7 +5,7 @@ interface ProductData {
   brand: string;
   category: string;
   description: string;
-  gst_percentage: string;
+  gst_percentage: number;
   has_variants: number;
   hsn_no: string;
   image: File | null;
@@ -96,9 +96,7 @@ const useAddProducts = (): UseAddProductsReturn => {
           brand: product.brand,
           category: product.category,
           description: product.description,
-          gst_percentage: product.gst_percentage
-            ? String(product.gst_percentage)
-            : "0",
+          gst_percentage: product.gst_percentage || 0,
           has_variants: product.has_variants,
           hsn_no: product.hsn_no,
           image: imageString,
