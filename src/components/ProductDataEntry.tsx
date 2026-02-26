@@ -123,7 +123,7 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
           type="text"
           value={value as string || ''}
           onChange={(e) => updateRow(row.id, fieldName, e.target.value)}
-          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[36px] placeholder-nowrap"
           placeholder={field.label}
           {...(field.type === 'textarea' && { as: 'textarea', rows: 3 })}
         />
@@ -135,41 +135,50 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
           type="number"
           value={value as number || ''}
           onChange={(e) => updateRow(row.id, fieldName, parseFloat(e.target.value) || 0)}
-          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[36px] placeholder-nowrap"
           placeholder={field.label}
         />
       );
 
     case 'select':
-      { const options = field.values?.map((opt) => ({
-        value: opt.value,
-        label: opt.label
-      })) || [];
+      { 
+        // Special handling for sub_category field to use dynamic options
+        let options;
+        if (field.name === 'sub_category' && row.availableSubCategories && row.availableSubCategories.length > 0) {
+          options = row.availableSubCategories;
+        } else {
+          options = field.values?.map((opt) => ({
+            value: opt.value,
+            label: opt.label
+          })) || [];
+        }
 
-      return (
-        <ReactSelect
-          value={value ? { value: value as string, label: value as string } : null}
-          onChange={(selectedOption: OptionType | null) => {
-            updateRow(row.id, fieldName, selectedOption?.value || '');
-          }}
-          options={options}
-          placeholder={`Select ${field.label.toLowerCase()}...`}
-          className="text-sm"
-          menuPortalTarget={document.body}
-          styles={{
-            control: (provided) => ({
-              ...provided,
-              minWidth: 150,
-              minHeight: 36,
-            }),
-            menuPortal: (provided) => ({
-              ...provided,
-              zIndex: 9999,
-            }),
-          }}
-          isSearchable
-        />
-      ); }
+        return (
+          <ReactSelect
+            value={value ? { value: value as string, label: value as string } : null}
+            onChange={(selectedOption: OptionType | null) => {
+              updateRow(row.id, fieldName, selectedOption?.value || '');
+            }}
+            options={options}
+            placeholder={`Select ${field.label.toLowerCase()}...`}
+            className="text-sm"
+            menuPortalTarget={document.body}
+            styles={{
+              control: (provided) => ({
+                ...provided,
+                minWidth: 150,
+                minHeight: 36,
+              }),
+              menuPortal: (provided) => ({
+                ...provided,
+                zIndex: 9999,
+              }),
+            }}
+            isSearchable
+            isDisabled={field.name === 'sub_category' && (!row.availableSubCategories || row.availableSubCategories.length === 0)}
+          />
+        ); 
+      }
 
     case 'autocomplete':
       // Special handling for brand field
@@ -216,7 +225,7 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
           type="text"
           value={value as string || ''}
           onChange={(e) => updateRow(row.id, fieldName, e.target.value)}
-          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[36px] placeholder-nowrap"
           placeholder={field.label}
         />
       );
@@ -369,7 +378,7 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
           type="text"
           value={value as string || ''}
           onChange={(e) => updateRow(row.id, fieldName, e.target.value)}
-          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[36px] placeholder-nowrap"
           placeholder={field.label}
         />
       );
@@ -540,7 +549,12 @@ export default function ProductDataEntry() {
 
       // Fetch and update subcategories for this specific row
       if (value) {  // Only fetch if category is not empty
-        const subCategories = await fetchSubCategories(businessId, value as string);
+        // Find the label corresponding to the selected value
+        const categoryField = dummyData.find(f => f.name === 'category');
+        const selectedOption = categoryField?.values?.find(opt => opt.value === value);
+        const categoryLabel = selectedOption?.label || value as string;
+        
+        const subCategories = await fetchSubCategories(businessId, categoryLabel);
 
         setRows(prev => 
           prev.map(row => {
