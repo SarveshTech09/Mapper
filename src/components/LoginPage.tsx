@@ -98,7 +98,7 @@ const LoginPage = ({ onLoginSuccess }: { onLoginSuccess?: () => void }) => {
       textAlign: "center" as const
     },
     panel: {
-      backgroundColor: token.colorBgContainer,
+      backgroundColor: "#ffffff",
       borderRadius: screens.md ? token.borderRadiusLG : "0",
       boxShadow: screens.md ? token.boxShadowTertiary : "none",
       margin: "0 auto",
@@ -116,7 +116,8 @@ const LoginPage = ({ onLoginSuccess }: { onLoginSuccess?: () => void }) => {
       color: token.colorTextSecondary
     },
     title: {
-      fontSize: screens.md ? token.fontSizeHeading2 : token.fontSizeHeading3
+      fontSize: screens.md ? token.fontSizeHeading2 : token.fontSizeHeading3,
+      color: "#6B46C1"
     }
   };
 
@@ -136,10 +137,9 @@ const LoginPage = ({ onLoginSuccess }: { onLoginSuccess?: () => void }) => {
             remember: true,
           }}
           layout="vertical"
-          requiredMark="optional"
         >
           <Form.Item 
-            label="Mobile Number"
+            label={<span style={{ fontWeight: "bold" }}>Mobile Number</span>}
             validateStatus={errors.mobile ? "error" : ""}
             help={errors.mobile}
           >
@@ -158,12 +158,12 @@ const LoginPage = ({ onLoginSuccess }: { onLoginSuccess?: () => void }) => {
             help={errors.password}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: token.marginSM }}>
-              <span>Enter PIN</span>
+              <span style={{ fontWeight: "bold" }}>Enter PIN</span>
               <Button
                 type="text"
                 icon={showPin ? <EyeInvisibleOutlined /> : <EyeTwoTone />}
                 onClick={() => setShowPin(!showPin)}
-                style={{ color: showPin ? '#ff4d4f' : token.colorTextDescription }}
+                style={{ color: showPin ? '#718096' : '#718096' }}
               />
             </div>
             
@@ -206,7 +206,16 @@ const LoginPage = ({ onLoginSuccess }: { onLoginSuccess?: () => void }) => {
           </Form.Item>
 
           <Form.Item style={{ marginBottom: "0px" }}>
-            <Button block={true} type="primary" onClick={handleLogin} loading={loading}>
+            <Button
+              block
+              onClick={handleLogin}
+              loading={loading}
+              style={{
+                backgroundColor: "#DD6B20",
+                borderColor: "#DD6B20",
+                color: "#ffffff"
+              }}
+            >
               Log in
             </Button>
           </Form.Item>
