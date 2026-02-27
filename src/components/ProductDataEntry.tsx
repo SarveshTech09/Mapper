@@ -377,19 +377,40 @@ export default function ProductDataEntry() {
 
   return (
     <div className="space-y-4">
+      <style>{`
+        @keyframes gradientMove {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .gradient-btn {
+          background: linear-gradient(135deg, #DD6B20 0%, #E53E3E 50%, #6B46C1 100%);
+          background-size: 200% 200%;
+          animation: gradientMove 4s ease infinite;
+        }
+        .gradient-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 25px rgba(221, 107, 32, 0.3);
+        }
+        .card-glass {
+          background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.3);
+        }
+      `}</style>
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 via-red-500 to-purple-600 bg-clip-text text-transparent">
             Product Master Data Entry
           </h2>
           <p className="text-gray-600 mt-1">
             Add and manage products directly in the grid
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={addNewRow}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 font-medium shadow-lg hover:shadow-xl"
           >
             <Plus className="w-5 h-5" />
             Add New Product
@@ -399,7 +420,7 @@ export default function ProductDataEntry() {
             disabled={
               rows.some((row) => saving === row.id) || addProductsLoading
             }
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
+            className="gradient-btn flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
           >
             <Save className="w-5 h-5" />
             Submit All
@@ -408,32 +429,32 @@ export default function ProductDataEntry() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto">
+        <div className="flex items-center gap-3 p-4 bg-red-50/50 border border-red-200/50 rounded-xl text-red-700 shadow-sm backdrop-blur-sm">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500" />
+          <span className="font-medium">{error}</span>
+          <button onClick={() => setError(null)} className="ml-auto hover:bg-red-100 p-1 rounded-lg transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {success && (
-        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-          <Check className="w-5 h-5 flex-shrink-0" />
-          <span>{success}</span>
+        <div className="flex items-center gap-3 p-4 bg-green-50/50 border border-green-200/50 rounded-xl text-green-700 shadow-sm backdrop-blur-sm">
+          <Check className="w-5 h-5 flex-shrink-0 text-green-500" />
+          <span className="font-medium">{success}</span>
         </div>
       )}
 
-      <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm bg-white">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 sticky top-0">
+      <div className="overflow-x-auto card-glass rounded-2xl shadow-xl border border-white/30 backdrop-blur-sm">
+        <table className="min-w-full divide-y divide-gray-200/50">
+          <thead className="bg-white/50 sticky top-0 backdrop-blur-sm border-b border-gray-200/30">
             <tr>
               {[
                 {
                   key: "brand_name",
                   label: "Brand Name",
                   className:
-                    "px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]",
+                    "px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px] bg-white/30",
                 },
                 {
                   key: "product_name",
@@ -493,7 +514,7 @@ export default function ProductDataEntry() {
                   key: "actions",
                   label: "Actions",
                   className:
-                    "px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]",
+                    "px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-white min-w-[120px] border-l border-gray-200",
                 },
               ].map((header) => (
                 <th key={header.key} className={header.className}>
@@ -502,7 +523,7 @@ export default function ProductDataEntry() {
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white/30 divide-y divide-gray-200/30">
             {filteredRows.length === 0 ? (
               <tr>
                 <td
@@ -510,8 +531,8 @@ export default function ProductDataEntry() {
                   className="px-6 py-12 text-center text-gray-500"
                 >
                   <div className="flex flex-col items-center gap-3">
-                    <div className="text-lg font-medium">No products found</div>
-                    <p className="text-sm">
+                    <div className="text-lg font-medium bg-gradient-to-r from-gray-600 to-gray-700 bg-clip-text text-transparent">No products found</div>
+                    <p className="text-sm text-gray-600">
                       Click "Add New Product" to start adding products
                     </p>
                   </div>
@@ -521,7 +542,7 @@ export default function ProductDataEntry() {
               filteredRows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`${row.isNew ? "bg-blue-50" : row.status === "inactive" ? "bg-gray-50 opacity-60" : "hover:bg-gray-50"} transition-colors`}
+                  className={`${row.isNew ? "bg-blue-50/30 hover:bg-blue-50/50" : row.status === "inactive" ? "bg-gray-50/30 opacity-60" : "hover:bg-white/50"} transition-all duration-200`}
                 >
                   <td className="px-3 py-2">
                     <CreatableSelect
@@ -882,12 +903,12 @@ export default function ProductDataEntry() {
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                   </td>
-                  <td className="px-3 py-2 text-center sticky right-0 bg-white">
+                  <td className="px-3 py-2 text-center sticky right-0 bg-white border-l border-gray-200">
                     <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={() => saveRow(row)}
                         disabled={saving === row.id}
-                        className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                        className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-all duration-200 disabled:opacity-50 hover:scale-110"
                         title="Save"
                       >
                         <Save className="w-4 h-4" />
@@ -895,7 +916,7 @@ export default function ProductDataEntry() {
                       {row.isNew ? (
                         <button
                           onClick={() => cancelNewRow(row.id)}
-                          className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                          className="p-1.5 text-gray-600 hover:bg-gray-200 rounded-lg transition-all duration-200 hover:scale-110"
                           title="Cancel"
                         >
                           <X className="w-4 h-4" />
@@ -903,7 +924,7 @@ export default function ProductDataEntry() {
                       ) : (
                         <button
                           onClick={() => deleteRow(row)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-110"
                           title="Deactivate"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -918,16 +939,17 @@ export default function ProductDataEntry() {
         </table>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 px-4 py-3 rounded-lg">
+      <div className="flex items-center justify-between text-sm text-gray-600 bg-white/30 px-4 py-3 rounded-xl border border-gray-200/30 backdrop-blur-sm">
         <div>
           Showing:{" "}
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-gray-900 bg-gradient-to-r from-orange-600 to-red-500 bg-clip-text text-transparent">
             {filteredRows.length}
           </span>{" "}
           products
         </div>
-        <div className="text-xs text-gray-500">
-          * Required fields | Click Save icon to save each row
+        <div className="text-xs text-gray-500 flex items-center gap-2">
+          <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-lg text-xs">* Required fields</span>
+          <span>Click Save icon to save each row</span>
         </div>
       </div>
     </div>

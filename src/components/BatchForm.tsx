@@ -244,27 +244,34 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <style>{`
+        .card-glass {
+          background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.3);
+        }
+      `}</style>
       {error && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{error}</span>
+        <div className="flex items-center gap-3 p-4 bg-red-50/50 border border-red-200/50 rounded-xl text-red-700 shadow-sm backdrop-blur-sm">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500" />
+          <span className="font-medium">{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-          <Check className="w-5 h-5 flex-shrink-0" />
-          <span>Batch added successfully!</span>
+        <div className="flex items-center gap-3 p-4 bg-green-50/50 border border-green-200/50 rounded-xl text-green-700 shadow-sm backdrop-blur-sm">
+          <Check className="w-5 h-5 flex-shrink-0 text-green-500" />
+          <span className="font-medium">Batch added successfully!</span>
         </div>
       )}
 
       <div className="space-y-4">
-        <div className="relative">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="relative card-glass rounded-2xl p-6 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Select Product <span className="text-red-500">*</span>
           </label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-400" />
             <input
               type="text"
               value={searchTerm}
@@ -273,29 +280,29 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
                 setShowDropdown(true);
               }}
               onFocus={() => setShowDropdown(true)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
               placeholder="Search product by name, brand, or generic name"
               required
             />
           </div>
 
           {showDropdown && filteredProducts.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            <div className="absolute z-10 w-full mt-2 card-glass border border-white/30 rounded-2xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-sm">
               {filteredProducts.map((product) => (
                 <button
                   key={product.id}
                   type="button"
                   onClick={() => handleProductSelect(product)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                  className="w-full text-left px-4 py-3 hover:bg-orange-50/30 border-b border-gray-100/30 last:border-b-0 transition-all duration-200 rounded-xl hover:scale-[1.02] m-1"
                 >
                   <div className="font-medium text-gray-900">{product.product_name}</div>
                   {(product.brand_name || product.generic_name) && (
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-600 mt-1">
                       {product.brand_name} {product.brand_name && product.generic_name && '•'} {product.generic_name}
                     </div>
                   )}
                   {product.strength && (
-                    <div className="text-xs text-gray-400 mt-1">Strength: {product.strength}</div>
+                    <div className="text-xs text-gray-500 mt-2 bg-white/30 px-2 py-1 rounded-lg inline-block">Strength: {product.strength}</div>
                   )}
                 </button>
               ))}
@@ -304,15 +311,15 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
         </div>
 
         {formData.product_id && (
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="text-sm font-medium text-blue-900">Selected: {formData.product_name}</div>
+          <div className="p-4 bg-gradient-to-r from-blue-50/50 to-purple-50/30 border border-blue-200/50 rounded-2xl shadow-sm backdrop-blur-sm">
+            <div className="text-sm font-medium text-blue-900 bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent">Selected: {formData.product_name}</div>
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Batch Number <span className="text-red-500">*</span>
           </label>
           <input
@@ -321,13 +328,13 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
             value={formData.batch_number}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
             placeholder="Enter batch number"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Initial Quantity <span className="text-red-500">*</span>
           </label>
           <input
@@ -337,13 +344,13 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
             onChange={handleChange}
             required
             min="0"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
             placeholder="Enter quantity"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Manufacturing Date
           </label>
           <input
@@ -351,12 +358,12 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
             name="manufacturing_date"
             value={formData.manufacturing_date}
             onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Expiry Date
           </label>
           <input
@@ -364,12 +371,12 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
             name="expiry_date"
             value={formData.expiry_date}
             onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Purchase Rate
           </label>
           <input
@@ -379,13 +386,13 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
             onChange={handleChange}
             step="0.01"
             min="0"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
             placeholder="0.00"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             MRP
           </label>
           <input
@@ -395,20 +402,20 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
             onChange={handleChange}
             step="0.01"
             min="0"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
             placeholder="0.00"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             GST %
           </label>
           <select
             name="gst_percentage"
             value={formData.gst_percentage}
             onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
           >
             <option value="0">0%</option>
             <option value="5">5%</option>
@@ -418,8 +425,8 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
           </select>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Warehouse Location
           </label>
           <input
@@ -427,13 +434,13 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
             name="warehouse_location"
             value={formData.warehouse_location}
             onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
             placeholder="e.g., Rack A, Shelf 3"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Supplier Name
           </label>
           <input
@@ -441,13 +448,13 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
             name="supplier_name"
             value={formData.supplier_name}
             onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
             placeholder="Enter supplier name"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Purchase Invoice No
           </label>
           <input
@@ -455,30 +462,30 @@ export default function BatchForm({ onSuccess }: BatchFormProps) {
             name="purchase_invoice_no"
             value={formData.purchase_invoice_no}
             onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white/50 backdrop-blur-sm shadow-sm"
             placeholder="Enter invoice number"
           />
         </div>
 
-        <div className="flex items-center">
+        <div className="card-glass rounded-2xl p-5 shadow-lg border border-white/30 flex items-center">
           <input
             type="checkbox"
             name="cold_storage"
             checked={formData.cold_storage}
             onChange={handleChange}
-            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
           />
-          <label className="ml-2 text-sm font-medium text-gray-700">
+          <label className="ml-3 text-sm font-medium text-gray-700">
             Cold Storage Required
           </label>
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 pt-4">
         <button
           type="submit"
           disabled={loading}
-          className="flex-1 bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 gradient-btn py-3.5 px-6 text-white rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Adding Batch...' : 'Add Batch/Stock'}
         </button>

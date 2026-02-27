@@ -8,18 +8,17 @@ interface StatusMessageProps {
 }
 
 export const StatusMessage: React.FC<StatusMessageProps> = ({ type, message, onClose }) => {
-  const bgColor = type === 'error' ? 'bg-red-50' : 'bg-green-50';
-  const borderColor = type === 'error' ? 'border-red-200' : 'border-green-200';
+  const bgColor = type === 'error' ? 'bg-red-50/50' : 'bg-green-50/50';
+  const borderColor = type === 'error' ? 'border-red-200/50' : 'border-green-200/50';
   const textColor = type === 'error' ? 'text-red-700' : 'text-green-700';
-  const iconColor = type === 'error' ? 'text-red-500' : 'text-green-500';
-  const icon = type === 'error' ? <AlertCircle className="w-5 h-5 flex-shrink-0" /> : <Check className="w-5 h-5 flex-shrink-0" />;
+  const icon = type === 'error' ? <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500" /> : <Check className="w-5 h-5 flex-shrink-0 text-green-500" />;
 
   return (
-    <div className={`flex items-center gap-2 p-4 ${bgColor} border ${borderColor} rounded-lg ${textColor}`}>
+    <div className={`flex items-center gap-3 p-4 ${bgColor} border ${borderColor} rounded-xl ${textColor} shadow-sm backdrop-blur-sm`}>
       {icon}
-      <span>{message}</span>
+      <span className="font-medium">{message}</span>
       {onClose && (
-        <button onClick={onClose} className="ml-auto">
+        <button onClick={onClose} className="ml-auto hover:bg-white/30 p-1 rounded-lg transition-colors">
           <X className="w-4 h-4" />
         </button>
       )}
