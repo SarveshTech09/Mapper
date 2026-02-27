@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Save, X, AlertCircle, Check, Trash2, Keyboard } from 'lucide-react';
-import ReactSelect from 'react-select';
+import { Plus, Save, X, Keyboard } from 'lucide-react';
 import useAddVariants from '../hooks/useAddVariants';
 import useSubmitVariant from '../hooks/useSubmitVariant';
-
+import { StatusMessage, LoadingSpinner } from './ui/StatusMessages';
+import { ParentRow, ChildRow } from './ui/TableRowComponents';
 
 interface Product {
   id: number; // Original numeric ID from API
@@ -13,9 +13,11 @@ interface Product {
   variant_type?: string;
 }
 
-interface BatchRow {
+export interface BatchRow {
   id: string;
   isNew: boolean;
+  isChild: boolean;
+  parentId?: string;
   product_id: string;
   product_name: string;
   product_brand: string;
@@ -27,6 +29,7 @@ interface BatchRow {
   price: number;
   offer: number;
   quantity: number;
+  __children?: BatchRow[];
 }
 
 export default function InventoryDataEntry() {
@@ -104,10 +107,11 @@ export default function InventoryDataEntry() {
       
       setBrands(brandsData);
       
-      // Initialize with one empty row
+      // Initialize with one empty parent row
       setRows([{
         id: `temp-${Date.now()}`,
         isNew: true,
+        isChild: false,
         product_id: '',
         product_name: '',
         product_brand: '',
@@ -119,6 +123,7 @@ export default function InventoryDataEntry() {
         price: 0,
         offer: 0,
         quantity: 0,
+        __children: []
       }]);
       
     } catch (err) {
@@ -128,6 +133,7 @@ export default function InventoryDataEntry() {
       setRows([{
         id: `temp-${Date.now()}`,
         isNew: true,
+        isChild: false,
         product_id: '',
         product_name: '',
         product_brand: '',
@@ -139,6 +145,7 @@ export default function InventoryDataEntry() {
         price: 0,
         offer: 0,
         quantity: 0,
+        __children: []
       }]);
     } finally {
       setLoading(false);
@@ -175,6 +182,7 @@ export default function InventoryDataEntry() {
     const newRow: BatchRow = {
       id: `temp-${Date.now()}`,
       isNew: true,
+      isChild: false,
       product_id: '',
       product_name: '',
       product_brand: '',
@@ -186,13 +194,47 @@ export default function InventoryDataEntry() {
       price: 0,
       offer: 0,
       quantity: 0,
+      __children: []
     };
     
     setRows([newRow, ...rows]);
   };
 
+  const addVariantToProduct = (parentId: string) => {
+    const newVariant: BatchRow = {
+      id: `temp-${Date.now()}`,
+      isNew: true,
+      isChild: true,
+      parentId: parentId,
+      product_id: '',
+      product_name: '',
+      product_brand: '',
+      product_has_variants: false,
+      product_variant_type: '',
+      variant_name: '',
+      uom: '',
+      value: '',
+      price: 0,
+      offer: 0,
+      quantity: 0
+    };
+
+    setRows(prevRows => {
+      return prevRows.map(row => {
+        if (row.id === parentId) {
+          return {
+            ...row,
+            __children: [...(row.__children || []), newVariant]
+          };
+        }
+        return row;
+      });
+    });
+  };
+
   const updateRow = (id: string, field: keyof BatchRow, value: any) => {
     setRows(rows.map(row => {
+      // Handle parent row updates
       if (row.id === id) {
         const updated = { ...row, [field]: value };
 
@@ -227,50 +269,75 @@ export default function InventoryDataEntry() {
           }
         }
 
-        if (field === 'quantity' && row.isNew) {
-          updated.quantity = value;
-        }
-
         return updated;
       }
+      
+      // Handle child row updates
+      if (row.__children) {
+        const updatedChildren = row.__children.map(child => {
+          if (child.id === id) {
+            return { ...child, [field]: value };
+          }
+          return child;
+        });
+        
+        return { ...row, __children: updatedChildren };
+      }
+      
       return row;
     }));
   };
 
-  const saveRow = async (row: BatchRow) => {
+  const saveRow = async (row: BatchRow, isChild: boolean = false, parentId?: string) => {
+    // For child rows, we need to get the parent product info
+    let productInfo = row;
+    
+    if (isChild && parentId) {
+      // Find the parent to get product information
+      const parentRow = rows.find(r => r.id === parentId);
+      if (parentRow) {
+        productInfo = {
+          ...row,
+          product_id: parentRow.product_id,
+          product_name: parentRow.product_name,
+          product_brand: parentRow.product_brand
+        };
+      }
+    }
+    
     // Check if the selected product actually exists in our products array
-    const selectedProduct = products.find(p => p.id.toString() === row.product_id);
+    const selectedProduct = products.find(p => p.id.toString() === productInfo.product_id);
     if (!selectedProduct) {
       setError('Selected product not found. Please reselect the product.');
       return;
     }
 
     // Ensure we have a product name
-    if (!row.product_name) {
+    if (!productInfo.product_name) {
       setError('Product name is missing. Please reselect the product.');
       return;
     }
 
     // Validate that we have a product_id
-    if (!row.product_id) {
+    if (!productInfo.product_id) {
       setError('Product ID is required');
       return;
     }
 
     // Validate required fields for variant submission
-    if (!row.uom) {
+    if (!productInfo.uom) {
       setError('Unit of measure is required');
       return;
     }
-    if (!row.value) {
+    if (!productInfo.value) {
       setError('Value is required');
       return;
     }
-    if (!row.price || row.price <= 0) {
+    if (!productInfo.price || productInfo.price <= 0) {
       setError('Valid price is required');
       return;
     }
-    if (!row.quantity || row.quantity <= 0) {
+    if (!productInfo.quantity || productInfo.quantity <= 0) {
       setError('Valid quantity is required');
       return;
     }
@@ -282,13 +349,13 @@ export default function InventoryDataEntry() {
     try {
       // Prepare the payload for useSubmitVariant
       const variantData = {
-        product_name: row.variant_name || row.product_name,
-        uom: row.uom,
-        value: row.value,
-        mrp: row.price.toString(),
-        sell_price: row.offer && row.offer > 0 ? row.offer.toString() : row.price.toString(),
-        available_quantity: row.quantity.toString(),
-        product_id: row.product_id
+        product_name: productInfo.variant_name || productInfo.product_name,
+        uom: productInfo.uom,
+        value: productInfo.value,
+        mrp: productInfo.price.toString(),
+        sell_price: productInfo.offer && productInfo.offer > 0 ? productInfo.offer.toString() : productInfo.price.toString(),
+        available_quantity: productInfo.quantity.toString(),
+        product_id: productInfo.product_id
       };
 
       console.log('Submitting variant:', variantData);
@@ -310,11 +377,28 @@ export default function InventoryDataEntry() {
     }
   };
 
-  const deleteRow = async (row: BatchRow) => {
+  const deleteRow = async (row: BatchRow, isChild: boolean = false, parentId?: string) => {
     if (row.isNew) {
-      setRows(rows.filter(r => r.id !== row.id));
+      if (isChild && parentId) {
+        // Remove child from parent's children array
+        setRows(prevRows => {
+          return prevRows.map(parentRow => {
+            if (parentRow.id === parentId && parentRow.__children) {
+              return {
+                ...parentRow,
+                __children: parentRow.__children.filter(child => child.id !== row.id)
+              };
+            }
+            return parentRow;
+          });
+        });
+      } else {
+        // Remove parent row
+        setRows(rows.filter(r => r.id !== row.id));
+      }
       return;
     }
+    
     if (!confirm('Are you sure you want to delete this batch?')) {
       return;
     }
@@ -331,14 +415,30 @@ export default function InventoryDataEntry() {
     }
   };
   
-  const cancelNewRow = (id: string) => {
-    setRows(rows.filter(row => row.id !== id));
+  const cancelNewRow = (id: string, isChild: boolean = false, parentId?: string) => {
+    if (isChild && parentId) {
+      // Remove child from parent's children array
+      setRows(prevRows => {
+        return prevRows.map(parentRow => {
+          if (parentRow.id === parentId && parentRow.__children) {
+            return {
+              ...parentRow,
+              __children: parentRow.__children.filter(child => child.id !== id)
+            };
+          }
+          return parentRow;
+        });
+      });
+    } else {
+      // Remove parent row
+      setRows(rows.filter(row => row.id !== id));
+    }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="medium" />
       </div>
     );
   }
@@ -349,17 +449,32 @@ export default function InventoryDataEntry() {
     setSuccess(null);
     setBulkOperationActive(true);
     
-    // Filter rows with required data
-    const rowsWithRequiredData = rows.filter(row => 
-      row.product_name && 
-      row.product_name.trim() !== '' &&
-      row.uom && 
-      row.value && 
-      row.price && row.price > 0 &&
-      row.quantity && row.quantity > 0
-    );
+    // Collect all rows including children
+    const allRows: {row: BatchRow, isChild: boolean, parentId?: string}[] = [];
     
-    if (rowsWithRequiredData.length === 0) {
+    rows.forEach(row => {
+      // Add parent row if it has required data
+      if (row.product_name && row.product_name.trim() !== '' &&
+          row.uom && row.value && 
+          row.price && row.price > 0 &&
+          row.quantity && row.quantity > 0) {
+        allRows.push({row, isChild: false});
+      }
+      
+      // Add child rows if they exist
+      if (row.__children && row.__children.length > 0) {
+        row.__children.forEach(child => {
+          if (child.variant_name && child.variant_name.trim() !== '' &&
+              child.uom && child.value && 
+              child.price && child.price > 0 &&
+              child.quantity && child.quantity > 0) {
+            allRows.push({row: child, isChild: true, parentId: row.id});
+          }
+        });
+      }
+    });
+    
+    if (allRows.length === 0) {
       setError('No valid inventory entries to submit');
       setBulkOperationActive(false);
       return;
@@ -368,19 +483,34 @@ export default function InventoryDataEntry() {
     let successCount = 0;
     let errorCount = 0;
     
-    for (const row of rowsWithRequiredData) {
+    for (const {row, isChild, parentId} of allRows) {
       setSaving(row.id); // Show saving indicator for the current row
       
       try {
+        // For child rows, we need to get parent product info
+        let productInfo = row;
+        
+        if (isChild && parentId) {
+          const parentRow = rows.find(r => r.id === parentId);
+          if (parentRow) {
+            productInfo = {
+              ...row,
+              product_id: parentRow.product_id,
+              product_name: parentRow.product_name,
+              product_brand: parentRow.product_brand
+            };
+          }
+        }
+        
         // Prepare the payload for useSubmitVariant
         const variantData = {
-          product_name: row.variant_name || row.product_name,
-          uom: row.uom,
-          value: row.value,
-          mrp: row.price.toString(),
-          sell_price: row.offer && row.offer > 0 ? row.offer.toString() : row.price.toString(),
-          available_quantity: row.quantity.toString(),
-          product_id: row.product_id
+          product_name: productInfo.variant_name || productInfo.product_name,
+          uom: productInfo.uom,
+          value: productInfo.value,
+          mrp: productInfo.price.toString(),
+          sell_price: productInfo.offer && productInfo.offer > 0 ? productInfo.offer.toString() : productInfo.price.toString(),
+          available_quantity: productInfo.quantity.toString(),
+          product_id: productInfo.product_id
         };
         
         console.log(`Submitting variant for row ${row.id}:`, variantData);
@@ -407,9 +537,9 @@ export default function InventoryDataEntry() {
       // Reload data to clear the form
       await loadData();
     } else if (successCount === 0) {
-      setError(`Failed to submit all ${rowsWithRequiredData.length} variant${rowsWithRequiredData.length !== 1 ? 's' : ''}`);
+      setError(`Failed to submit all ${allRows.length} variant${allRows.length !== 1 ? 's' : ''}`);
     } else {
-      setSuccess(`${successCount} of ${rowsWithRequiredData.length} variant${rowsWithRequiredData.length !== 1 ? 's' : ''} submitted successfully`);
+      setSuccess(`${successCount} of ${allRows.length} variant${allRows.length !== 1 ? 's' : ''} submitted successfully`);
       setError(`${errorCount} variant${errorCount !== 1 ? 's' : ''} failed to submit`);
     }
     
@@ -452,7 +582,7 @@ export default function InventoryDataEntry() {
           </button>
         </div>
       </div>
-
+  
       {showShortcuts && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">
@@ -480,30 +610,25 @@ export default function InventoryDataEntry() {
           </div>
         </div>
       )}
-
+  
       {(error || submitError) && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{error || submitError}</span>
-          <button onClick={() => {
+        <StatusMessage 
+          type="error" 
+          message={error || submitError || ''} 
+          onClose={() => {
             setError(null);
             if (submitError) {
               // We need to access the hook's setError - but since it's internal,
               // we'll just clear our local error state
             }
-          }} className="ml-auto">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          }} 
+        />
       )}
-
+  
       {success && (
-        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-          <Check className="w-5 h-5 flex-shrink-0" />
-          <span>{success}</span>
-        </div>
+        <StatusMessage type="success" message={success} />
       )}
-
+  
       <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm bg-white">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0">
@@ -514,8 +639,8 @@ export default function InventoryDataEntry() {
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]">
                 Product *
               </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                Variant Name *
+              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]">
+                Product/Variant Name *
               </th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
                 UOM
@@ -532,7 +657,7 @@ export default function InventoryDataEntry() {
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
                 Quantity
               </th>
-              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]">
+              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[150px]">
                 Actions
               </th>
             </tr>
@@ -540,7 +665,7 @@ export default function InventoryDataEntry() {
           <tbody className="bg-white divide-y divide-gray-200">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <div className="text-lg font-medium">No inventory data yet</div>
                     <p className="text-sm">Click "Add New Row" or press Ctrl/Cmd + N to start adding inventory</p>
@@ -549,229 +674,42 @@ export default function InventoryDataEntry() {
               </tr>
             ) : (
               rows.map((row) => (
-                <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : 'hover:bg-gray-50'} transition-colors`}>
-                  <td className="px-3 py-2">
-                    {row.isNew ? (
-                      <ReactSelect
-                        value={row.product_brand ? { value: row.product_brand, label: row.product_brand } : null}
-                        onChange={(selectedOption: { value: string; label: string } | null) => {
-                          if (selectedOption) {
-                            updateRow(row.id, 'product_brand', selectedOption.value);
-                          } else {
-                            updateRow(row.id, 'product_brand', '');
-                          }
-                        }}
-                        options={brands.map(brand => ({
-                          value: brand, 
-                          label: brand
-                        }))}
-                        placeholder="Search brand..."
-                        className="text-sm"
-                        menuPortalTarget={document.body}
-                        styles={{
-                          control: (provided) => ({
-                            ...provided,
-                            minWidth: 200,
-                            minHeight: 36,
-                          }),
-                          menuPortal: (provided) => ({
-                            ...provided,
-                            zIndex: 9999,
-                          }),
-                          valueContainer: (provided) => ({
-                            ...provided,
-                            paddingLeft: 8,
-                            paddingRight: 8,
-                          }),
-                        }}
-                        isSearchable
-                        closeMenuOnSelect={true}
-                        blurInputOnSelect={true}
-                        isLoading={brandsLoading}
-                      />
-                    ) : (
-                      <select
-                        value={row.product_brand}
-                        onChange={(e) => updateRow(row.id, 'product_brand', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        disabled={!row.isNew}
-                      >
-                        <option value="">Select Brand</option>
-                        {brands.map(brand => (
-                          <option key={brand} value={brand}>
-                            {brand}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {row.isNew ? (
-                      <ReactSelect
-                        value={products.find(p => p.id.toString() === row.product_id) 
-                          ? { value: row.product_id, label: `${products.find(p => p.id.toString() === row.product_id)?.product_name}${products.find(p => p.id.toString() === row.product_id)?.brand_name ? ` (${products.find(p => p.id.toString() === row.product_id)?.brand_name})` : ''}` }
-                          : null}
-                        onChange={(selectedOption: { value: string; label: string } | null) => {
-                          if (selectedOption) {
-                            updateRow(row.id, 'product_id', selectedOption.value);
-                          } else {
-                            updateRow(row.id, 'product_id', '');
-                          }
-                        }}
-                        options={products
-                          .filter(p => p.brand_name === row.product_brand)
-                          .map(product => ({
-                            value: product.id.toString(), // Convert numeric ID to string
-                            label: product.product_name
-                          }))}
-                        placeholder="Search product..."
-                        className="text-sm"
-                        menuPortalTarget={document.body}
-                        styles={{
-                          control: (provided) => ({
-                            ...provided,
-                            minWidth: 200,
-                            minHeight: 36,
-                          }),
-                          menuPortal: (provided) => ({
-                            ...provided,
-                            zIndex: 9999,
-                          }),
-                          valueContainer: (provided) => ({
-                            ...provided,
-                            paddingLeft: 8,
-                            paddingRight: 8,
-                          }),
-                        }}
-                        isSearchable
-                        closeMenuOnSelect={true}
-                        blurInputOnSelect={true}
-                        isLoading={productsByBrandLoading && !!row.product_brand}
-                      />
-                    ) : (
-                      <select
-                        value={row.product_id}
-                        onChange={(e) => updateRow(row.id, 'product_id', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        disabled={!row.isNew}
-                      >
-                        <option value="">Select Product</option>
-                        {products.map(product => (
-                          <option key={product.id} value={product.id}>
-                            {product.product_name} {product.brand_name ? `(${product.brand_name})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.variant_name}
-                      onChange={(e) => updateRow(row.id, 'variant_name', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Variant Name"
-                      disabled={!row.isNew}
+                <>
+                  <ParentRow
+                    row={row}
+                    brands={brands}
+                    brandsLoading={brandsLoading}
+                    products={products}
+                    productsByBrandLoading={productsByBrandLoading}
+                    updateRow={updateRow}
+                    saveRow={saveRow}
+                    deleteRow={deleteRow}
+                    addVariantToProduct={addVariantToProduct}
+                    cancelNewRow={cancelNewRow}
+                    saving={saving}
+                    submitLoading={submitLoading}
+                  />
+                    
+                  {/* Child Rows */}
+                  {row.__children && row.__children.map((child) => (
+                    <ChildRow
+                      child={child}
+                      parentRowId={row.id}
+                      updateRow={updateRow}
+                      saveRow={saveRow}
+                      deleteRow={deleteRow}
+                      cancelNewRow={cancelNewRow}
+                      saving={saving}
+                      submitLoading={submitLoading}
                     />
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      value={row.uom}
-                      onChange={(e) => updateRow(row.id, 'uom', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      disabled={!row.isNew}
-                    >
-                      <option value="">Select UOM</option>
-                      <option value="GM">GM</option>
-                      <option value="Pack">Pack</option>
-                      <option value="kg">kg</option>
-                      <option value="Piece">Piece</option>
-                      <option value="Box">Box</option>
-                      <option value="Bag">Bag</option>
-                      <option value="Dozen">Dozen</option>
-                    </select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.value}
-                      onChange={(e) => updateRow(row.id, 'value', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Value"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.price || ''}
-                      onChange={(e) => updateRow(row.id, 'price', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      step="1"
-                      min="0"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.offer || ''}
-                      onChange={(e) => updateRow(row.id, 'offer', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      step="1"
-                      min="0"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.quantity || ''}
-                      onChange={(e) => updateRow(row.id, 'quantity', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      min="0"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-center sticky right-0 bg-white">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => saveRow(row)}
-                        disabled={saving === row.id || submitLoading}
-                        className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                        title="Save (Ctrl/Cmd + S)"
-                      >
-                        <Save className="w-4 h-4" />
-                      </button>
-                      {row.isNew ? (
-                        <button
-                          onClick={() => cancelNewRow(row.id)}
-                          className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                          title="Cancel"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => deleteRow(row)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                  ))}
+                </>
               ))
             )}
           </tbody>
         </table>
       </div>
-
+  
       <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 px-4 py-3 rounded-lg">
         <div>
           Total Batches: <span className="font-medium text-gray-900">{rows.length}</span>
