@@ -164,10 +164,6 @@ const LoginPage = ({ onLoginSuccess }: { onLoginSuccess?: () => void }) => {
           <button className="v5-btn" onClick={handleLogin} disabled={loading}>
             {loading ? <><span className="v5-spinner" />Verifying...</> : 'Get Started'}
           </button>
-          <div className="v5-bottom">
-            <a href="#">Forgot PIN?</a>
-            <span className="v5-help">Need help? Contact support</span>
-          </div>
         </div>
       </section>
     </>
