@@ -640,7 +640,7 @@ export default function InventoryDataEntry() {
                 Product *
               </th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]">
-                Product/Variant Name *
+                Variant Name *
               </th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
                 UOM
