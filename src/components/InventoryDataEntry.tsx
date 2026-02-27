@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Save, X, AlertCircle, Check, Trash2, Keyboard } from 'lucide-react';
-import ReactSelect from 'react-select';
+import { Plus, Save, X, Keyboard } from 'lucide-react';
 import useAddVariants from '../hooks/useAddVariants';
 import useSubmitVariant from '../hooks/useSubmitVariant';
-
+import { StatusMessage, LoadingSpinner } from './ui/StatusMessages';
+import { ParentRow, ChildRow } from './ui/TableRowComponents';
 
 interface Product {
   id: number; // Original numeric ID from API
@@ -13,7 +13,7 @@ interface Product {
   variant_type?: string;
 }
 
-interface BatchRow {
+export interface BatchRow {
   id: string;
   isNew: boolean;
   isChild: boolean;
@@ -438,7 +438,7 @@ export default function InventoryDataEntry() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="medium" />
       </div>
     );
   }
@@ -582,7 +582,7 @@ export default function InventoryDataEntry() {
           </button>
         </div>
       </div>
-
+  
       {showShortcuts && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">
@@ -610,30 +610,25 @@ export default function InventoryDataEntry() {
           </div>
         </div>
       )}
-
+  
       {(error || submitError) && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{error || submitError}</span>
-          <button onClick={() => {
+        <StatusMessage 
+          type="error" 
+          message={error || submitError || ''} 
+          onClose={() => {
             setError(null);
             if (submitError) {
               // We need to access the hook's setError - but since it's internal,
               // we'll just clear our local error state
             }
-          }} className="ml-auto">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          }} 
+        />
       )}
-
+  
       {success && (
-        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-          <Check className="w-5 h-5 flex-shrink-0" />
-          <span>{success}</span>
-        </div>
+        <StatusMessage type="success" message={success} />
       )}
-
+  
       <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm bg-white">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0">
@@ -680,340 +675,33 @@ export default function InventoryDataEntry() {
             ) : (
               rows.map((row) => (
                 <>
-                  {/* Parent Row */}
-                  <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : 'hover:bg-gray-50'} transition-colors`}>                    
-                    <td className="px-3 py-2">
-                      {row.isNew ? (
-                        <ReactSelect
-                          value={row.product_brand ? { value: row.product_brand, label: row.product_brand } : null}
-                          onChange={(selectedOption: { value: string; label: string } | null) => {
-                            if (selectedOption) {
-                              updateRow(row.id, 'product_brand', selectedOption.value);
-                            } else {
-                              updateRow(row.id, 'product_brand', '');
-                            }
-                          }}
-                          options={brands.map(brand => ({
-                            value: brand, 
-                            label: brand
-                          }))}
-                          placeholder="Search brand..."
-                          className="text-sm"
-                          menuPortalTarget={document.body}
-                          styles={{
-                            control: (provided) => ({
-                              ...provided,
-                              minWidth: 200,
-                              minHeight: 36,
-                            }),
-                            menuPortal: (provided) => ({
-                              ...provided,
-                              zIndex: 9999,
-                            }),
-                            valueContainer: (provided) => ({
-                              ...provided,
-                              paddingLeft: 8,
-                              paddingRight: 8,
-                            }),
-                          }}
-                          isSearchable
-                          closeMenuOnSelect={true}
-                          blurInputOnSelect={true}
-                          isLoading={brandsLoading}
-                        />
-                      ) : (
-                        <select
-                          value={row.product_brand}
-                          onChange={(e) => updateRow(row.id, 'product_brand', e.target.value)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          disabled={!row.isNew}
-                        >
-                          <option value="">Select Brand</option>
-                          {brands.map(brand => (
-                            <option key={brand} value={brand}>
-                              {brand}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      {row.isNew ? (
-                        <ReactSelect
-                          value={products.find(p => p.id.toString() === row.product_id) 
-                            ? { value: row.product_id, label: `${products.find(p => p.id.toString() === row.product_id)?.product_name}${products.find(p => p.id.toString() === row.product_id)?.brand_name ? ` (${products.find(p => p.id.toString() === row.product_id)?.brand_name})` : ''}` }
-                            : null}
-                          onChange={(selectedOption: { value: string; label: string } | null) => {
-                            if (selectedOption) {
-                              updateRow(row.id, 'product_id', selectedOption.value);
-                            } else {
-                              updateRow(row.id, 'product_id', '');
-                            }
-                          }}
-                          options={products
-                            .filter(p => p.brand_name === row.product_brand)
-                            .map(product => ({
-                              value: product.id.toString(), // Convert numeric ID to string
-                              label: product.product_name
-                            }))}
-                          placeholder="Search product..."
-                          className="text-sm"
-                          menuPortalTarget={document.body}
-                          styles={{
-                            control: (provided) => ({
-                              ...provided,
-                              minWidth: 200,
-                              minHeight: 36,
-                            }),
-                            menuPortal: (provided) => ({
-                              ...provided,
-                              zIndex: 9999,
-                            }),
-                            valueContainer: (provided) => ({
-                              ...provided,
-                              paddingLeft: 8,
-                              paddingRight: 8,
-                            }),
-                          }}
-                          isSearchable
-                          closeMenuOnSelect={true}
-                          blurInputOnSelect={true}
-                          isLoading={productsByBrandLoading && !!row.product_brand}
-                        />
-                      ) : (
-                        <select
-                          value={row.product_id}
-                          onChange={(e) => updateRow(row.id, 'product_id', e.target.value)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          disabled={!row.isNew}
-                        >
-                          <option value="">Select Product</option>
-                          {products.map(product => (
-                            <option key={product.id} value={product.id}>
-                              {product.product_name} {product.brand_name ? `(${product.brand_name})` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={row.variant_name}
-                        onChange={(e) => updateRow(row.id, 'variant_name', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Product Name"
-                        disabled={!row.isNew}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={row.uom}
-                        onChange={(e) => updateRow(row.id, 'uom', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        disabled={!row.isNew}
-                      >
-                        <option value="">Select UOM</option>
-                        <option value="GM">GM</option>
-                        <option value="Pack">Pack</option>
-                        <option value="kg">kg</option>
-                        <option value="Piece">Piece</option>
-                        <option value="Box">Box</option>
-                        <option value="Bag">Bag</option>
-                        <option value="Dozen">Dozen</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={row.value}
-                        onChange={(e) => updateRow(row.id, 'value', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Value"
-                        disabled={!row.isNew}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={row.price || ''}
-                        onChange={(e) => updateRow(row.id, 'price', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0"
-                        step="1"
-                        min="0"
-                        disabled={!row.isNew}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={row.offer || ''}
-                        onChange={(e) => updateRow(row.id, 'offer', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0"
-                        step="1"
-                        min="0"
-                        disabled={!row.isNew}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={row.quantity || ''}
-                        onChange={(e) => updateRow(row.id, 'quantity', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0"
-                        min="0"
-                        disabled={!row.isNew}
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-center sticky right-0 bg-white">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => saveRow(row, false)}
-                          disabled={saving === row.id || submitLoading}
-                          className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                          title="Save (Ctrl/Cmd + S)"
-                        >
-                          <Save className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => addVariantToProduct(row.id)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="Add Variant"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                        {row.isNew ? (
-                          <button
-                            onClick={() => cancelNewRow(row.id, false)}
-                            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                            title="Cancel"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => deleteRow(row, false)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  
+                  <ParentRow
+                    row={row}
+                    brands={brands}
+                    brandsLoading={brandsLoading}
+                    products={products}
+                    productsByBrandLoading={productsByBrandLoading}
+                    updateRow={updateRow}
+                    saveRow={saveRow}
+                    deleteRow={deleteRow}
+                    addVariantToProduct={addVariantToProduct}
+                    cancelNewRow={cancelNewRow}
+                    saving={saving}
+                    submitLoading={submitLoading}
+                  />
+                    
                   {/* Child Rows */}
                   {row.__children && row.__children.map((child) => (
-                    <tr key={child.id} className="bg-green-50 hover:bg-green-100 transition-colors border-l-4 border-green-400">
-                      <td className="px-3 py-2 text-sm text-gray-500 italic" colSpan={2}>
-                        Child Variant
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={child.variant_name}
-                          onChange={(e) => updateRow(child.id, 'variant_name', e.target.value)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                          placeholder="Variant Details"
-                          disabled={!child.isNew}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <select
-                          value={child.uom}
-                          onChange={(e) => updateRow(child.id, 'uom', e.target.value)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                          disabled={!child.isNew}
-                        >
-                          <option value="">Select UOM</option>
-                          <option value="GM">GM</option>
-                          <option value="Pack">Pack</option>
-                          <option value="kg">kg</option>
-                          <option value="Piece">Piece</option>
-                          <option value="Box">Box</option>
-                          <option value="Bag">Bag</option>
-                          <option value="Dozen">Dozen</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={child.value}
-                          onChange={(e) => updateRow(child.id, 'value', e.target.value)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                          placeholder="Value"
-                          disabled={!child.isNew}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          value={child.price || ''}
-                          onChange={(e) => updateRow(child.id, 'price', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                          placeholder="0"
-                          step="1"
-                          min="0"
-                          disabled={!child.isNew}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          value={child.offer || ''}
-                          onChange={(e) => updateRow(child.id, 'offer', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                          placeholder="0"
-                          step="1"
-                          min="0"
-                          disabled={!child.isNew}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          value={child.quantity || ''}
-                          onChange={(e) => updateRow(child.id, 'quantity', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                          placeholder="0"
-                          min="0"
-                          disabled={!child.isNew}
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-center sticky right-0 bg-green-50">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => saveRow(child, true, row.id)}
-                            disabled={saving === child.id || submitLoading}
-                            className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors disabled:opacity-50"
-                            title="Save Variant"
-                          >
-                            <Save className="w-4 h-4" />
-                          </button>
-                          {child.isNew ? (
-                            <button
-                              onClick={() => cancelNewRow(child.id, true, row.id)}
-                              className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                              title="Cancel"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => deleteRow(child, true, row.id)}
-                              className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                    <ChildRow
+                      child={child}
+                      parentRowId={row.id}
+                      updateRow={updateRow}
+                      saveRow={saveRow}
+                      deleteRow={deleteRow}
+                      cancelNewRow={cancelNewRow}
+                      saving={saving}
+                      submitLoading={submitLoading}
+                    />
                   ))}
                 </>
               ))
@@ -1021,7 +709,7 @@ export default function InventoryDataEntry() {
           </tbody>
         </table>
       </div>
-
+  
       <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 px-4 py-3 rounded-lg">
         <div>
           Total Batches: <span className="font-medium text-gray-900">{rows.length}</span>
