@@ -19,76 +19,90 @@ export const useUserData = () => {
   const [error, setError] = useState<string | null>(userDataError);
 
   useEffect(() => {
+
     const fetchUserData = async () => {
-      // If data is already cached, don't fetch again
+
+      // ✅ If already cached
       if (userDataCache) {
+        setUserData(userDataCache);
+        setLoading(false);
         return;
       }
-      
-      // If another instance is already loading, wait for it
-      if (userDataLoading) {
-        // Poll for the cached data
-        const pollInterval = setInterval(() => {
-          if (userDataCache || userDataError) {
-            clearInterval(pollInterval);
-            setUserData(userDataCache);
-            setError(userDataError);
-            setLoading(false);
-          }
-        }, 100);
-        return;
-      }
-      
+
+      // ✅ Prevent multiple calls
+      if (userDataLoading) return;
+
       userDataLoading = true;
       setLoading(true);
-      
+
       const token = localStorage.getItem("access_token");
+
+      console.log("TOKEN:", token);
+
       if (!token) {
-        userDataError = "No access token found";
-        setError("No access token found");
-        userDataLoading = false;
+        setError("No access token");
         setLoading(false);
         return;
       }
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_BASE_URL}/api/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        const response = await fetch(
+          `${import.meta.env.VITE_BASE_URL}/api/me`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json"
+            }
+          }
+        );
+
+        console.log("STATUS:", response.status);
 
         const data = await response.json();
-        
-        // Validate the response structure
-        if (data && typeof data.business_id !== 'undefined') {
-          userDataCache = {
-            business_id: data.business_id,
-            sub_category_id: data.sub_category_id || undefined
-          };
-          setUserData(userDataCache);
-        } else {
-          throw new Error('Invalid user data received');
-        }
+
+        console.log("API RESPONSE:", data);
+
+        // ✅ Store both values
+        const result = {
+          business_id: data.business_id,
+          sub_category_id: data.sub_category_id
+        };
+
+        // ✅ Cache
+        userDataCache = result;
+
+        // ✅ React state
+        setUserData(result);
+
+        // ✅ LocalStorage
+        localStorage.setItem("business_id", result.business_id ?? "");
+        localStorage.setItem("sub_category_id", result.sub_category_id ?? "");
+
       } catch (err) {
-        console.error('Error fetching user data:', err);
-        userDataError = err instanceof Error ? err.message : 'Failed to fetch user data';
+
+        console.error("ERROR:", err);
+
+        userDataError = "Failed to fetch";
+
         setError(userDataError);
+
       } finally {
+
         userDataLoading = false;
         setLoading(false);
+
       }
+
     };
 
     fetchUserData();
-    
-    // Cleanup function to reset loading state if component unmounts
-    return () => {
-      // Don't reset the cache when component unmounts
-    };
+
   }, []);
 
   return { userData, loading, error };
+
+
+ 
 };

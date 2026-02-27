@@ -3,20 +3,29 @@ import { Package, ClipboardList, Boxes, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthProvider';
 
 const NAV_TABS = [
-  { path: '/inventory', label: 'Batch Data Entry',     icon: Package       },
-  { path: '/products',  label: 'Product Master Entry', icon: Boxes         },
+  { path: '/inventory', label: 'Batch Data Entry',     icon: Package },
+  { path: '/products',  label: 'Product Master Entry', icon: Boxes },
   { path: '/',          label: 'Dashboard View',       icon: ClipboardList },
 ];
 
 const Dashboard = () => {
+
   const { logout } = useAuth();
   const navigate   = useNavigate();
   const location   = useLocation();
+
+
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+
+
+
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

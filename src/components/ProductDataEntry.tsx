@@ -8,6 +8,7 @@ import useBrands from '../hooks/useBrands';
 import useProductsByBrand from '../hooks/useProductsByBrand';
 import useAddProducts from '../hooks/useAddProducts';
 import { dummyData } from './data';
+import { accountdetails } from '../hooks/use_dynamci';
 
 // Define the Option type for react-select
 interface OptionType {
@@ -53,12 +54,22 @@ interface FieldType {
   name: string;
   label: string;
   required?: boolean;
-  values?: { value: string; label: string; selected?: boolean }[];
+  values?: ({ value: string; label: string; selected?: boolean } | { value: string })[];
+  className?: string;
+  access?: boolean;
+  subtype?: string;
+  multiple?: boolean;
+  requireValidOption?: boolean;
+  QueryRule?: string;
+  inline?: boolean;
+  other?: boolean;
+  toggle?: boolean;
+  DataType?: string;
 }
 
 // Helper function to render field based on its type
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, field: keyof ProductRow, value: string | number | boolean | File) => Promise<void>, rowIndex: number, rowProductsMap: Record<string, any[]>, rowLoadingMap: Record<string, boolean>, brands: string[], brandsLoading: boolean, setSuccess: (msg: string | null) => void) => {
+const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, field: keyof ProductRow, value: string | number | boolean | File) => Promise<void>, rowIndex: number, rowProductsMap: Record<string, any[]>, rowLoadingMap: Record<string, boolean>, brandsLoading: boolean, setSuccess: (msg: string | null) => void) => {
   // Map field names from data.tsx to ProductRow interface
   const fieldMapping: Record<string, keyof ProductRow> = {
     'brand': 'brand_name',
@@ -149,10 +160,14 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
         if (field.name === 'sub_category' && row.availableSubCategories && row.availableSubCategories.length > 0) {
           options = row.availableSubCategories;
         } else {
-          options = field.values?.map((opt) => ({
-            value: opt.value,
-            label: opt.label
-          })) || [];
+          options = field.values?.map((opt) => {
+            // Handle both structures: { value, label } and { value }
+            if ('label' in opt) {
+              return { value: opt.value, label: opt.label };
+            } else {
+              return { value: opt.value, label: opt.value };
+            }
+          }) || [];
         }
 
         return (
@@ -187,16 +202,22 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
     case 'autocomplete':
       // Special handling for brand field
       if (field.name === 'brand') {
+        // Extract brand values from field configuration
+        const brandOptions = field.values?.map(opt => {
+          if ('label' in opt) {
+            return { value: opt.value, label: opt.label };
+          } else {
+            return { value: opt.value, label: opt.value };
+          }
+        }) || [];
+        
         return (
           <ReactSelect
             value={value ? { value: value as string, label: value as string } : null}
             onChange={(selectedOption: OptionType | null) => {
               updateRow(row.id, fieldName, selectedOption?.value || '');
             }}
-            options={brands.map((brand: string) => ({
-              value: brand,
-              label: brand
-            }))}
+            options={brandOptions}
             placeholder="Search brand..."
             className="text-sm"
             menuPortalTarget={document.body}
@@ -237,19 +258,25 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
     case 'radio-group':
       return (
         <div className="flex gap-4">
-          {field.values?.map((option, idx: number) => (
-            <label key={idx} className="flex items-center gap-1 text-sm">
-              <input
-                type="radio"
-                name={`${field.name}-${rowIndex}`}
-                value={option.value}
-                checked={value === option.value}
-                onChange={(e) => updateRow(row.id, fieldName, e.target.value)}
-                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-              />
-              {option.label}
-            </label>
-          ))}
+          {field.values?.map((option, idx: number) => {
+            // Handle both structures: { value, label } and { value }
+            const optionLabel = 'label' in option ? option.label : option.value;
+            const optionValue = option.value;
+            
+            return (
+              <label key={idx} className="flex items-center gap-1 text-sm">
+                <input
+                  type="radio"
+                  name={`${field.name}-${rowIndex}`}
+                  value={optionValue}
+                  checked={value === optionValue}
+                  onChange={(e) => updateRow(row.id, fieldName, e.target.value)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                {optionLabel}
+              </label>
+            );
+          })}
         </div>
       );
 
@@ -389,12 +416,11 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
   }
 };
 
-const generateDynamicHeaders = (): HeaderConfig[] => {
+const generateDynamicHeaders = (fields: FieldType[]): HeaderConfig[] => {
   const headers: HeaderConfig[] = [];
 
   // First pass: Add all fields except file type
-  dummyData.forEach((field) => {
-
+  fields.forEach((field) => {
     let label = field.label;
     const key = field.name;
     let className = 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider';
@@ -444,6 +470,8 @@ const generateDynamicHeaders = (): HeaderConfig[] => {
 };
 
 export default function ProductDataEntry() {
+  const [dynamicFields, setDynamicFields] = useState<FieldType[]>([]);
+  const [formLoading, setFormLoading] = useState(true);
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -471,6 +499,28 @@ export default function ProductDataEntry() {
   
   // Use add products hook for API submission
   const { addProducts, loading: addProductsLoading, error: addProductsError } = useAddProducts();
+  
+  // Fetch dynamic form configuration
+  useEffect(() => {
+    const fetchFormConfig = async () => {
+      try {
+        const response = await accountdetails('product_catalogs');
+        if (response.success && response.fields) {
+          setDynamicFields(response.fields);
+        } else {
+          console.error('Failed to fetch form configuration:', response);
+          setDynamicFields(dummyData); // Fallback to hardcoded data
+        }
+      } catch (error) {
+        console.error('Error fetching form configuration:', error);
+        setDynamicFields(dummyData); // Fallback to hardcoded data
+      } finally {
+        setFormLoading(false);
+      }
+    };
+    
+    fetchFormConfig();
+  }, []);
 
 
 
@@ -486,8 +536,8 @@ export default function ProductDataEntry() {
 
   // Initialize with one empty row when all required data is loaded
   useEffect(() => {
-    // Initialize with one empty row when user data and categories are loaded
-    if (!userLoading && !categoriesLoading && !brandsLoading && rows.length === 0) {
+    // Initialize with one empty row when user data, categories, brands, and form config are loaded
+    if (!userLoading && !categoriesLoading && !brandsLoading && !formLoading && rows.length === 0) {
       setRows([{ 
         id: `initial-${Date.now()}`, 
         isNew: true, 
@@ -513,7 +563,7 @@ export default function ProductDataEntry() {
         availableSubCategories: [],
       }]);
     }
-  }, [userLoading, categoriesLoading, brandsLoading, rows.length]);
+  }, [userLoading, categoriesLoading, brandsLoading, formLoading, rows.length]);
 
 
 
@@ -557,9 +607,23 @@ export default function ProductDataEntry() {
       // Fetch and update subcategories for this specific row
       if (value) {  // Only fetch if category is not empty
         // Find the label corresponding to the selected value
-        const categoryField = dummyData.find(f => f.name === 'category');
-        const selectedOption = categoryField?.values?.find(opt => opt.value === value);
-        const categoryLabel = selectedOption?.label || value as string;
+        const categoryField = dynamicFields.length > 0 ? dynamicFields : dummyData;
+        const fieldData = categoryField.find(f => f.name === 'category');
+        const selectedOption = fieldData?.values?.find(opt => {
+          if ('label' in opt) {
+            return opt.value === value;
+          } else {
+            return opt.value === value;
+          }
+        });
+        
+        // Extract label depending on the structure
+        let categoryLabel = value as string;
+        if (selectedOption && 'label' in selectedOption) {
+          categoryLabel = selectedOption.label;
+        } else if (selectedOption) {
+          categoryLabel = selectedOption.value;
+        }
         
         const subCategories = await fetchSubCategories(businessId, categoryLabel);
 
@@ -749,7 +813,7 @@ export default function ProductDataEntry() {
     setRows(rows.filter(row => row.id !== id));
   };
 
-  if (userLoading || categoriesLoading || brandsLoading) {
+  if (userLoading || categoriesLoading || brandsLoading || formLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -764,6 +828,9 @@ export default function ProductDataEntry() {
 
 
 
+  // Use dynamic fields fetched from API, fallback to dummy data if none loaded yet
+  const currentFields = dynamicFields.length > 0 ? dynamicFields : dummyData;
+  
   // Show all rows since filters have been removed
   const filteredRows = rows;
 
@@ -805,7 +872,7 @@ export default function ProductDataEntry() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0">
             <tr>
-              {generateDynamicHeaders().map((header) => (
+              {generateDynamicHeaders(currentFields).map((header) => (
                 <th 
                   key={header.key}
                   className={header.className}
@@ -813,6 +880,7 @@ export default function ProductDataEntry() {
                   {header.label}
                 </th>
               ))}
+              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -828,10 +896,10 @@ export default function ProductDataEntry() {
             ) : (
               filteredRows.map((row, rowIndex) => (
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : row.status === 'inactive' ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'} transition-colors`}>
-                  {dummyData
+                  {currentFields
                     .map((field) => (
                       <td key={field.name} className="px-3 py-2">
-                        {renderField(field, row, updateRow, rowIndex, rowProductsMap, rowLoadingMap, brands, brandsLoading, setSuccess)}
+                        {renderField(field, row, updateRow, rowIndex, rowProductsMap, rowLoadingMap, brandsLoading, setSuccess)}
                       </td>
                     ))}
                   <td className="px-3 py-2 text-center sticky right-0 bg-white">
