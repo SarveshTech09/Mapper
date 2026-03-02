@@ -997,7 +997,6 @@ export default function ProductDataEntry() {
                   {header.label}
                 </th>
               ))}
-              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
