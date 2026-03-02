@@ -508,6 +508,76 @@ export default function InventoryDataEntry() {
     }
   };
   
+  // Helper function to generate dynamic headers
+  interface HeaderConfig {
+    key: string;
+    label: string;
+    className: string;
+  }
+  
+  const generateDynamicHeaders = (fields: FieldType[]): HeaderConfig[] => {
+    const headers: HeaderConfig[] = [];
+    
+    // Add static headers for brand and product first
+    headers.push({ 
+      key: 'brand', 
+      label: 'Brand', 
+      className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' 
+    });
+    headers.push({ 
+      key: 'product', 
+      label: 'Product *', 
+      className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]' 
+    });
+    
+    // Process remaining dynamic fields
+    fields.forEach((field) => {
+      // Skip brand and title fields since they're handled separately
+      if (field.name === 'brand' || field.name === 'title') {
+        return;
+      }
+      
+      let label = field.label;
+      const key = field.name;
+      let className = 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider';
+
+      // Add required indicator
+      if (field.required) {
+        label += ' *';
+      }
+
+      // Set specific widths based on field name
+      const widthMap: Record<string, string> = {
+        'category': 'min-w-[120px]',
+        'sub_category': 'min-w-[120px]',
+        'hsn_no': 'min-w-[100px]',
+        'gst_percentage': 'min-w-[80px]',
+        'employee_percentage': 'min-w-[120px]',
+        'prescription_required': 'min-w-[120px]',
+        'is_inventory': 'min-w-[120px]',
+        'description': 'min-w-[200px]'
+      };
+
+      const widthClass = widthMap[field.name] || 'min-w-[150px]';
+      className += ` ${widthClass}`;
+
+      headers.push({
+        key,
+        label,
+        className
+      });
+    });
+
+    // Add actions column at the very end
+    headers.push({
+      key: 'actions',
+      label: 'Actions',
+      className: 'px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]'
+    });
+
+    return headers;
+  };
+  
   const loadProductsForBrand = async (brandName: string) => {
     try {
       const brandProducts = await fetchProductsByBrand(brandName);
@@ -769,29 +839,14 @@ export default function InventoryDataEntry() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0">
             <tr>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                Brand
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]">
-                Product *
-              </th>
-              {/* Dynamic columns */}
-              {(() => {
-                // Filter out 'brand' and 'title'/'product' from dynamic fields since they're handled separately
-                const dynamicFieldsFiltered = currentFields.filter(field => field.name !== 'brand' && field.name !== 'title');
-                
-                return dynamicFieldsFiltered.map((field) => (
-                  <th 
-                    key={field.name}
-                    className={`px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider ${(field.name === 'category' ? 'min-w-[120px]' : field.name === 'sub_category' ? 'min-w-[120px]' : field.name === 'hsn_no' ? 'min-w-[100px]' : field.name === 'gst_percentage' ? 'min-w-[80px]' : field.name === 'description' ? 'min-w-[200px]' : 'min-w-[150px]')}`}
-                  >
-                    {field.label}{field.required ? ' *' : ''}
-                  </th>
-                ));
-              })()}
-              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]">
-                Actions
-              </th>
+              {generateDynamicHeaders(currentFields).map((header) => (
+                <th 
+                  key={header.key}
+                  className={header.className}
+                >
+                  {header.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
