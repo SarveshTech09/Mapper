@@ -16,6 +16,8 @@ interface Product {
 interface BatchRow {
   id: string;
   isNew: boolean;
+  isChild: boolean;
+  parentId?: string;
   product_id: string;
   product_name: string;
   product_brand: string;
@@ -27,9 +29,28 @@ interface BatchRow {
   price: number;
   offer: number;
   quantity: number;
+  __children?: BatchRow[];
 }
 
 export default function InventoryDataEntry() {
+  // Add gradient button styles
+  const gradientStyles = `
+    @keyframes gradientMove {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .gradient-btn {
+      background: linear-gradient(135deg, #DD6B20 0%, #E53E3E 50%, #6B46C1 100%);
+      background-size: 200% 200%;
+      animation: gradientMove 4s ease infinite;
+    }
+    .gradient-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(221, 107, 32, 0.3);
+    }
+  `;
+
   const [rows, setRows] = useState<BatchRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +82,11 @@ export default function InventoryDataEntry() {
   }, []);
 
   const handleKeyboardShortcut = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
     if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
       e.preventDefault();
       addNewRow();
@@ -72,14 +98,42 @@ export default function InventoryDataEntry() {
         saveRow(firstNewRow);
       }
     }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      submitAllRows();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      setShowShortcuts(prev => !prev);
+    }
     if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
-      const target = e.target as HTMLElement;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT' && target.tagName !== 'TEXTAREA') {
-        e.preventDefault();
-        setShowShortcuts(prev => !prev);
+      e.preventDefault();
+      setShowShortcuts(prev => !prev);
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      e.preventDefault();
+      const firstInput = document.querySelector('input, select') as HTMLElement;
+      if (firstInput) {
+        firstInput.focus();
       }
     }
-  }, [rows]);
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault();
+      const activeElement = document.activeElement as HTMLInputElement;
+      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+        activeElement.select();
+      }
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (showShortcuts) {
+        setShowShortcuts(false);
+      }
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    }
+  }, [rows, showShortcuts]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyboardShortcut);
@@ -108,6 +162,7 @@ export default function InventoryDataEntry() {
       setRows([{
         id: `temp-${Date.now()}`,
         isNew: true,
+        isChild: false,
         product_id: '',
         product_name: '',
         product_brand: '',
@@ -119,6 +174,7 @@ export default function InventoryDataEntry() {
         price: 0,
         offer: 0,
         quantity: 0,
+        __children: []
       }]);
       
     } catch (err) {
@@ -128,6 +184,7 @@ export default function InventoryDataEntry() {
       setRows([{
         id: `temp-${Date.now()}`,
         isNew: true,
+        isChild: false,
         product_id: '',
         product_name: '',
         product_brand: '',
@@ -139,6 +196,7 @@ export default function InventoryDataEntry() {
         price: 0,
         offer: 0,
         quantity: 0,
+        __children: []
       }]);
     } finally {
       setLoading(false);
@@ -175,6 +233,7 @@ export default function InventoryDataEntry() {
     const newRow: BatchRow = {
       id: `temp-${Date.now()}`,
       isNew: true,
+      isChild: false,
       product_id: '',
       product_name: '',
       product_brand: '',
@@ -186,13 +245,48 @@ export default function InventoryDataEntry() {
       price: 0,
       offer: 0,
       quantity: 0,
+      __children: []
     };
     
     setRows([newRow, ...rows]);
   };
 
+  const addVariantToProduct = (parentId: string) => {
+    const newVariant: BatchRow = {
+      id: `temp-${Date.now()}`,
+      isNew: true,
+      isChild: true,
+      parentId: parentId,
+      product_id: '',
+      product_name: '',
+      product_brand: '',
+      product_has_variants: false,
+      product_variant_type: '',
+      variant_name: '',
+      uom: '',
+      value: '',
+      price: 0,
+      offer: 0,
+      quantity: 0,
+      __children: []
+    };
+
+    setRows(prevRows => {
+      return prevRows.map(row => {
+        if (row.id === parentId) {
+          return {
+            ...row,
+            __children: [...(row.__children || []), newVariant]
+          };
+        }
+        return row;
+      });
+    });
+  };
+
   const updateRow = (id: string, field: keyof BatchRow, value: any) => {
     setRows(rows.map(row => {
+      // Handle parent row updates
       if (row.id === id) {
         const updated = { ...row, [field]: value };
 
@@ -233,44 +327,73 @@ export default function InventoryDataEntry() {
 
         return updated;
       }
+      
+      // Handle child row updates
+      if (row.__children) {
+        const updatedChildren = row.__children.map(child => {
+          if (child.id === id) {
+            return { ...child, [field]: value };
+          }
+          return child;
+        });
+        
+        return { ...row, __children: updatedChildren };
+      }
+      
       return row;
     }));
   };
 
   const saveRow = async (row: BatchRow) => {
+    // For child rows, we need to get the parent product info
+    let productInfo = row;
+    
+    if (row.isChild && row.parentId) {
+      // Find the parent to get product information
+      const parentRow = rows.find(r => r.id === row.parentId);
+      if (parentRow) {
+        productInfo = {
+          ...row,
+          product_id: parentRow.product_id,
+          product_name: parentRow.product_name,
+          product_brand: parentRow.product_brand
+        };
+      }
+    }
+    
     // Check if the selected product actually exists in our products array
-    const selectedProduct = products.find(p => p.id.toString() === row.product_id);
+    const selectedProduct = products.find(p => p.id.toString() === productInfo.product_id);
     if (!selectedProduct) {
       setError('Selected product not found. Please reselect the product.');
       return;
     }
 
     // Ensure we have a product name
-    if (!row.product_name) {
+    if (!productInfo.product_name) {
       setError('Product name is missing. Please reselect the product.');
       return;
     }
 
     // Validate that we have a product_id
-    if (!row.product_id) {
+    if (!productInfo.product_id) {
       setError('Product ID is required');
       return;
     }
 
     // Validate required fields for variant submission
-    if (!row.uom) {
+    if (!productInfo.uom) {
       setError('Unit of measure is required');
       return;
     }
-    if (!row.value) {
+    if (!productInfo.value) {
       setError('Value is required');
       return;
     }
-    if (!row.price || row.price <= 0) {
+    if (!productInfo.price || productInfo.price <= 0) {
       setError('Valid price is required');
       return;
     }
-    if (!row.quantity || row.quantity <= 0) {
+    if (!productInfo.quantity || productInfo.quantity <= 0) {
       setError('Valid quantity is required');
       return;
     }
@@ -282,13 +405,13 @@ export default function InventoryDataEntry() {
     try {
       // Prepare the payload for useSubmitVariant
       const variantData = {
-        product_name: row.variant_name || row.product_name,
-        uom: row.uom,
-        value: row.value,
-        mrp: row.price.toString(),
-        sell_price: row.offer && row.offer > 0 ? row.offer.toString() : row.price.toString(),
-        available_quantity: row.quantity.toString(),
-        product_id: row.product_id
+        product_name: productInfo.variant_name || productInfo.product_name,
+        uom: productInfo.uom,
+        value: productInfo.value,
+        mrp: productInfo.price.toString(),
+        sell_price: productInfo.offer && productInfo.offer > 0 ? productInfo.offer.toString() : productInfo.price.toString(),
+        available_quantity: productInfo.quantity.toString(),
+        product_id: productInfo.product_id
       };
 
       console.log('Submitting variant:', variantData);
@@ -312,9 +435,26 @@ export default function InventoryDataEntry() {
 
   const deleteRow = async (row: BatchRow) => {
     if (row.isNew) {
-      setRows(rows.filter(r => r.id !== row.id));
+      // If it's a child row, remove from parent's children array
+      if (row.isChild && row.parentId) {
+        setRows(prevRows => {
+          return prevRows.map(parentRow => {
+            if (parentRow.id === row.parentId && parentRow.__children) {
+              return {
+                ...parentRow,
+                __children: parentRow.__children.filter(child => child.id !== row.id)
+              };
+            }
+            return parentRow;
+          });
+        });
+      } else {
+        // Remove parent row
+        setRows(rows.filter(r => r.id !== row.id));
+      }
       return;
     }
+    
     if (!confirm('Are you sure you want to delete this batch?')) {
       return;
     }
@@ -331,8 +471,24 @@ export default function InventoryDataEntry() {
     }
   };
   
-  const cancelNewRow = (id: string) => {
-    setRows(rows.filter(row => row.id !== id));
+  const cancelNewRow = (id: string, isChild: boolean = false, parentId?: string) => {
+    if (isChild && parentId) {
+      // Remove child from parent's children array
+      setRows(prevRows => {
+        return prevRows.map(parentRow => {
+          if (parentRow.id === parentId && parentRow.__children) {
+            return {
+              ...parentRow,
+              __children: parentRow.__children.filter(child => child.id !== id)
+            };
+          }
+          return parentRow;
+        });
+      });
+    } else {
+      // Remove parent row
+      setRows(rows.filter(row => row.id !== id));
+    }
   };
 
   if (loading) {
@@ -349,17 +505,32 @@ export default function InventoryDataEntry() {
     setSuccess(null);
     setBulkOperationActive(true);
     
-    // Filter rows with required data
-    const rowsWithRequiredData = rows.filter(row => 
-      row.product_name && 
-      row.product_name.trim() !== '' &&
-      row.uom && 
-      row.value && 
-      row.price && row.price > 0 &&
-      row.quantity && row.quantity > 0
-    );
+    // Collect all rows including children
+    const allRows: {row: BatchRow, isChild: boolean, parentId?: string}[] = [];
     
-    if (rowsWithRequiredData.length === 0) {
+    rows.forEach(row => {
+      // Add parent row if it has required data
+      if (row.product_name && row.product_name.trim() !== '' &&
+          row.uom && row.value && 
+          row.price && row.price > 0 &&
+          row.quantity && row.quantity > 0) {
+        allRows.push({row, isChild: false});
+      }
+      
+      // Add child rows if they exist
+      if (row.__children && row.__children.length > 0) {
+        row.__children.forEach(child => {
+          if (child.variant_name && child.variant_name.trim() !== '' &&
+              child.uom && child.value && 
+              child.price && child.price > 0 &&
+              child.quantity && child.quantity > 0) {
+            allRows.push({row: child, isChild: true, parentId: row.id});
+          }
+        });
+      }
+    });
+    
+    if (allRows.length === 0) {
       setError('No valid inventory entries to submit');
       setBulkOperationActive(false);
       return;
@@ -368,19 +539,34 @@ export default function InventoryDataEntry() {
     let successCount = 0;
     let errorCount = 0;
     
-    for (const row of rowsWithRequiredData) {
+    for (const {row, isChild, parentId} of allRows) {
       setSaving(row.id); // Show saving indicator for the current row
       
       try {
+        // For child rows, we need to get parent product info
+        let productInfo = row;
+        
+        if (isChild && parentId) {
+          const parentRow = rows.find(r => r.id === parentId);
+          if (parentRow) {
+            productInfo = {
+              ...row,
+              product_id: parentRow.product_id,
+              product_name: parentRow.product_name,
+              product_brand: parentRow.product_brand
+            };
+          }
+        }
+        
         // Prepare the payload for useSubmitVariant
         const variantData = {
-          product_name: row.variant_name || row.product_name,
-          uom: row.uom,
-          value: row.value,
-          mrp: row.price.toString(),
-          sell_price: row.offer && row.offer > 0 ? row.offer.toString() : row.price.toString(),
-          available_quantity: row.quantity.toString(),
-          product_id: row.product_id
+          product_name: productInfo.variant_name || productInfo.product_name,
+          uom: productInfo.uom,
+          value: productInfo.value,
+          mrp: productInfo.price.toString(),
+          sell_price: productInfo.offer && productInfo.offer > 0 ? productInfo.offer.toString() : productInfo.price.toString(),
+          available_quantity: productInfo.quantity.toString(),
+          product_id: productInfo.product_id
         };
         
         console.log(`Submitting variant for row ${row.id}:`, variantData);
@@ -407,9 +593,9 @@ export default function InventoryDataEntry() {
       // Reload data to clear the form
       await loadData();
     } else if (successCount === 0) {
-      setError(`Failed to submit all ${rowsWithRequiredData.length} variant${rowsWithRequiredData.length !== 1 ? 's' : ''}`);
+      setError(`Failed to submit all ${allRows.length} variant${allRows.length !== 1 ? 's' : ''}`);
     } else {
-      setSuccess(`${successCount} of ${rowsWithRequiredData.length} variant${rowsWithRequiredData.length !== 1 ? 's' : ''} submitted successfully`);
+      setSuccess(`${successCount} of ${allRows.length} variant${allRows.length !== 1 ? 's' : ''} submitted successfully`);
       setError(`${errorCount} variant${errorCount !== 1 ? 's' : ''} failed to submit`);
     }
     
@@ -422,12 +608,13 @@ export default function InventoryDataEntry() {
   
   return (
     <div className="space-y-4">
+      <style>{gradientStyles}</style>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Inventory Data Entry</h2>
           <p className="text-gray-600 mt-1">Add and manage inventory directly in the grid</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={addNewRow}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -438,17 +625,10 @@ export default function InventoryDataEntry() {
           <button
             onClick={submitAllRows}
             disabled={bulkOperationActive || rows.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
+            className="gradient-btn flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
           >
             <Save className="w-5 h-5" />
             Submit All
-          </button>
-          <button
-            onClick={() => setShowShortcuts(!showShortcuts)}
-            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors text-sm"
-            title="Keyboard shortcuts (Press ?)"
-          >
-            <Keyboard className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -474,8 +654,28 @@ export default function InventoryDataEntry() {
               <span className="text-blue-800">Save first unsaved row</span>
             </div>
             <div className="flex items-center gap-3">
+              <kbd className="px-2 py-1 bg-white border border-blue-300 rounded font-mono text-xs">Ctrl/Cmd + Enter</kbd>
+              <span className="text-blue-800">Submit all rows</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <kbd className="px-2 py-1 bg-white border border-blue-300 rounded font-mono text-xs">Ctrl/Cmd + K</kbd>
+              <span className="text-blue-800">Toggle shortcuts</span>
+            </div>
+            <div className="flex items-center gap-3">
               <kbd className="px-2 py-1 bg-white border border-blue-300 rounded font-mono text-xs">?</kbd>
               <span className="text-blue-800">Toggle shortcuts</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <kbd className="px-2 py-1 bg-white border border-blue-300 rounded font-mono text-xs">Ctrl/Cmd + D</kbd>
+              <span className="text-blue-800">Focus first input</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <kbd className="px-2 py-1 bg-white border border-blue-300 rounded font-mono text-xs">Ctrl/Cmd + A</kbd>
+              <span className="text-blue-800">Select all text</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <kbd className="px-2 py-1 bg-white border border-blue-300 rounded font-mono text-xs">Escape</kbd>
+              <span className="text-blue-800">Blur input/focus</span>
             </div>
           </div>
         </div>
@@ -548,7 +748,8 @@ export default function InventoryDataEntry() {
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
+              rows.flatMap((row) => [
+                // Parent row
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : 'hover:bg-gray-50'} transition-colors`}>
                   <td className="px-3 py-2">
                     {row.isNew ? (
@@ -746,9 +947,16 @@ export default function InventoryDataEntry() {
                       >
                         <Save className="w-4 h-4" />
                       </button>
+                      <button
+                        onClick={() => addVariantToProduct(row.id)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Add Variant"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
                       {row.isNew ? (
                         <button
-                          onClick={() => cancelNewRow(row.id)}
+                          onClick={() => cancelNewRow(row.id, false)}
                           className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
                           title="Cancel"
                         >
@@ -765,8 +973,118 @@ export default function InventoryDataEntry() {
                       )}
                     </div>
                   </td>
-                </tr>
-              ))
+                </tr>,
+                
+                // Child rows
+                ...(row.__children || []).map((child) => (
+                  <tr key={child.id} className="bg-green-50 hover:bg-green-100 transition-colors border-l-4 border-green-400">
+                    <td className="px-3 py-2 text-sm text-gray-600 font-medium italic bg-green-50" colSpan={2}>
+                      Child Variant
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        value={child.variant_name}
+                        onChange={(e) => updateRow(child.id, 'variant_name', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
+                        placeholder="Variant Details"
+                        disabled={!child.isNew}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        value={child.uom}
+                        onChange={(e) => updateRow(child.id, 'uom', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
+                        disabled={!child.isNew}
+                      >
+                        <option value="">Select UOM</option>
+                        <option value="GM">GM</option>
+                        <option value="Pack">Pack</option>
+                        <option value="kg">kg</option>
+                        <option value="Piece">Piece</option>
+                        <option value="Box">Box</option>
+                        <option value="Bag">Bag</option>
+                        <option value="Dozen">Dozen</option>
+                      </select>
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        value={child.value}
+                        onChange={(e) => updateRow(child.id, 'value', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
+                        placeholder="Value"
+                        disabled={!child.isNew}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={child.price || ''}
+                        onChange={(e) => updateRow(child.id, 'price', e.target.value ? parseInt(e.target.value) || 0 : 0)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
+                        placeholder="0"
+                        step="1"
+                        min="0"
+                        disabled={!child.isNew}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={child.offer || ''}
+                        onChange={(e) => updateRow(child.id, 'offer', e.target.value ? parseInt(e.target.value) || 0 : 0)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
+                        placeholder="0"
+                        step="1"
+                        min="0"
+                        disabled={!child.isNew}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={child.quantity || ''}
+                        onChange={(e) => updateRow(child.id, 'quantity', e.target.value ? parseInt(e.target.value) || 0 : 0)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
+                        placeholder="0"
+                        min="0"
+                        disabled={!child.isNew}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center sticky right-0 bg-green-50">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => saveRow(child)}
+                          disabled={saving === child.id || submitLoading}
+                          className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors disabled:opacity-50"
+                          title="Save Variant"
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                        {child.isNew ? (
+                          <button
+                            onClick={() => cancelNewRow(child.id, true, child.parentId)}
+                            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                            title="Cancel"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => deleteRow(child)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ])
             )}
           </tbody>
         </table>
@@ -776,8 +1094,9 @@ export default function InventoryDataEntry() {
         <div>
           Total Batches: <span className="font-medium text-gray-900">{rows.length}</span>
         </div>
-        <div className="text-xs text-gray-500">
-          * Required fields | Ctrl/Cmd + N to add row | Ctrl/Cmd + S to save | ? for shortcuts
+        <div className="text-xs text-gray-500 flex items-center gap-2">
+          <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-lg text-xs">* Required fields</span>
+          <span>Ctrl/Cmd + N to add row | Ctrl/Cmd + S to save | Ctrl/Cmd + Enter to submit all | ? for shortcuts</span>
         </div>
       </div>
     </div>
