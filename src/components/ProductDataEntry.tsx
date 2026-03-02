@@ -419,8 +419,20 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
 const generateDynamicHeaders = (fields: FieldType[]): HeaderConfig[] => {
   const headers: HeaderConfig[] = [];
 
-  // First pass: Add all fields except file type
-  fields.forEach((field) => {
+  // Reorder fields to prioritize 'brand' field first
+  const reorderedFields = [...fields];
+  
+  // Find the brand field index
+  const brandFieldIndex = reorderedFields.findIndex(field => field.name === 'brand');
+  
+  // If brand field exists, move it to the beginning
+  if (brandFieldIndex !== -1) {
+    const brandField = reorderedFields.splice(brandFieldIndex, 1)[0];
+    reorderedFields.unshift(brandField);
+  }
+
+  // Process reordered fields
+  reorderedFields.forEach((field) => {
     let label = field.label;
     const key = field.name;
     let className = 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider';
@@ -896,12 +908,25 @@ export default function ProductDataEntry() {
             ) : (
               filteredRows.map((row, rowIndex) => (
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : row.status === 'inactive' ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'} transition-colors`}>
-                  {currentFields
-                    .map((field) => (
+                  {(() => {
+                    // Reorder fields to prioritize 'brand' field first
+                    const reorderedFields = [...currentFields];
+                    
+                    // Find the brand field index
+                    const brandFieldIndex = reorderedFields.findIndex(field => field.name === 'brand');
+                    
+                    // If brand field exists, move it to the beginning
+                    if (brandFieldIndex !== -1) {
+                      const brandField = reorderedFields.splice(brandFieldIndex, 1)[0];
+                      reorderedFields.unshift(brandField);
+                    }
+                    
+                    return reorderedFields.map((field) => (
                       <td key={field.name} className="px-3 py-2">
                         {renderField(field, row, updateRow, rowIndex, rowProductsMap, rowLoadingMap, brandsLoading, setSuccess)}
                       </td>
-                    ))}
+                    ));
+                  })()}
                   <td className="px-3 py-2 text-center sticky right-0 bg-white">
                     <div className="flex items-center justify-center gap-2">
                       <button

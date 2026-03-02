@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Save, X, AlertCircle, Check, Trash2, Keyboard } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Save, X, AlertCircle, Check, Trash2 } from 'lucide-react';
 import ReactSelect from 'react-select';
 import useAddVariants from '../hooks/useAddVariants';
 import useSubmitVariant from '../hooks/useSubmitVariant';
@@ -36,10 +36,6 @@ export default function InventoryDataEntry() {
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  
-  // Track bulk operation state
-  const [bulkOperationActive, setBulkOperationActive] = useState(false);
   
   const {
     fetchBrands,
@@ -59,32 +55,6 @@ export default function InventoryDataEntry() {
   useEffect(() => {
     loadData();
   }, []);
-
-  const handleKeyboardShortcut = useCallback((e: KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-      e.preventDefault();
-      addNewRow();
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      const firstNewRow = rows.find(r => r.isNew);
-      if (firstNewRow) {
-        saveRow(firstNewRow);
-      }
-    }
-    if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
-      const target = e.target as HTMLElement;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT' && target.tagName !== 'TEXTAREA') {
-        e.preventDefault();
-        setShowShortcuts(prev => !prev);
-      }
-    }
-  }, [rows]);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyboardShortcut);
-    return () => window.removeEventListener('keydown', handleKeyboardShortcut);
-  }, [handleKeyboardShortcut]);
 
   const [brands, setBrands] = useState<string[]>([]);
   
@@ -155,6 +125,7 @@ export default function InventoryDataEntry() {
       }
       
       // Transform to Product format - use original numeric ID directly
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const transformedProducts: Product[] = brandProducts.map((product: any) => ({
         id: product.id, // Original numeric ID from API
         product_name: product.product_name || product.title || product.name || '',
@@ -191,6 +162,7 @@ export default function InventoryDataEntry() {
     setRows([newRow, ...rows]);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateRow = (id: string, field: keyof BatchRow, value: any) => {
     setRows(rows.map(row => {
       if (row.id === id) {
@@ -227,10 +199,6 @@ export default function InventoryDataEntry() {
           }
         }
 
-        if (field === 'quantity' && row.isNew) {
-          updated.quantity = value;
-        }
-
         return updated;
       }
       return row;
@@ -257,24 +225,6 @@ export default function InventoryDataEntry() {
       return;
     }
 
-    // Validate required fields for variant submission
-    if (!row.uom) {
-      setError('Unit of measure is required');
-      return;
-    }
-    if (!row.value) {
-      setError('Value is required');
-      return;
-    }
-    if (!row.price || row.price <= 0) {
-      setError('Valid price is required');
-      return;
-    }
-    if (!row.quantity || row.quantity <= 0) {
-      setError('Valid quantity is required');
-      return;
-    }
-
     setSaving(row.id);
     setError(null);
     setSuccess(null);
@@ -282,12 +232,12 @@ export default function InventoryDataEntry() {
     try {
       // Prepare the payload for useSubmitVariant
       const variantData = {
-        product_name: row.variant_name || row.product_name,
-        uom: row.uom,
-        value: row.value,
-        mrp: row.price.toString(),
-        sell_price: row.offer && row.offer > 0 ? row.offer.toString() : row.price.toString(),
-        available_quantity: row.quantity.toString(),
+        product_name: row.product_name,
+        uom: 'Piece', // Default UOM
+        value: '1', // Default value
+        mrp: '0', // Default price
+        sell_price: '0', // Default sell price
+        available_quantity: '0', // Default quantity
         product_id: row.product_id
       };
 
@@ -315,7 +265,7 @@ export default function InventoryDataEntry() {
       setRows(rows.filter(r => r.id !== row.id));
       return;
     }
-    if (!confirm('Are you sure you want to delete this batch?')) {
+    if (!confirm('Are you sure you want to delete this row?')) {
       return;
     }
 
@@ -323,11 +273,11 @@ export default function InventoryDataEntry() {
       // Mock API call
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      setSuccess('Batch deleted successfully');
+      setSuccess('Row deleted successfully');
       await loadData();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete batch');
+      setError(err instanceof Error ? err.message : 'Failed to delete row');
     }
   };
   
@@ -342,83 +292,6 @@ export default function InventoryDataEntry() {
       </div>
     );
   }
-
-  // Function to submit all rows with data
-  const submitAllRows = async () => {
-    setError(null);
-    setSuccess(null);
-    setBulkOperationActive(true);
-    
-    // Filter rows with required data
-    const rowsWithRequiredData = rows.filter(row => 
-      row.product_name && 
-      row.product_name.trim() !== '' &&
-      row.uom && 
-      row.value && 
-      row.price && row.price > 0 &&
-      row.quantity && row.quantity > 0
-    );
-    
-    if (rowsWithRequiredData.length === 0) {
-      setError('No valid inventory entries to submit');
-      setBulkOperationActive(false);
-      return;
-    }
-    
-    let successCount = 0;
-    let errorCount = 0;
-    
-    for (const row of rowsWithRequiredData) {
-      setSaving(row.id); // Show saving indicator for the current row
-      
-      try {
-        // Prepare the payload for useSubmitVariant
-        const variantData = {
-          product_name: row.variant_name || row.product_name,
-          uom: row.uom,
-          value: row.value,
-          mrp: row.price.toString(),
-          sell_price: row.offer && row.offer > 0 ? row.offer.toString() : row.price.toString(),
-          available_quantity: row.quantity.toString(),
-          product_id: row.product_id
-        };
-        
-        console.log(`Submitting variant for row ${row.id}:`, variantData);
-        
-        const success = await submitVariant(variantData);
-        
-        if (success) {
-          successCount++;
-        } else {
-          errorCount++;
-        }
-      } catch (err) {
-        console.error(`Error submitting row ${row.id}:`, err);
-        errorCount++;
-      } finally {
-        setSaving(null); // Clear the saving indicator
-      }
-    }
-    
-    setBulkOperationActive(false);
-    
-    if (errorCount === 0) {
-      setSuccess(`${successCount} variant${successCount !== 1 ? 's' : ''} submitted successfully`);
-      // Reload data to clear the form
-      await loadData();
-    } else if (successCount === 0) {
-      setError(`Failed to submit all ${rowsWithRequiredData.length} variant${rowsWithRequiredData.length !== 1 ? 's' : ''}`);
-    } else {
-      setSuccess(`${successCount} of ${rowsWithRequiredData.length} variant${rowsWithRequiredData.length !== 1 ? 's' : ''} submitted successfully`);
-      setError(`${errorCount} variant${errorCount !== 1 ? 's' : ''} failed to submit`);
-    }
-    
-    // Clear success/error after 5 seconds
-    setTimeout(() => {
-      setSuccess(null);
-      setError(null);
-    }, 5000);
-  };
   
   return (
     <div className="space-y-4">
@@ -435,51 +308,10 @@ export default function InventoryDataEntry() {
             <Plus className="w-5 h-5" />
             Add New Row
           </button>
-          <button
-            onClick={submitAllRows}
-            disabled={bulkOperationActive || rows.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
-          >
-            <Save className="w-5 h-5" />
-            Submit All
-          </button>
-          <button
-            onClick={() => setShowShortcuts(!showShortcuts)}
-            className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors text-sm"
-            title="Keyboard shortcuts (Press ?)"
-          >
-            <Keyboard className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
-      {showShortcuts && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Keyboard className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-blue-900">Keyboard Shortcuts</h3>
-            </div>
-            <button onClick={() => setShowShortcuts(false)} className="text-blue-600 hover:text-blue-800">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div className="flex items-center gap-3">
-              <kbd className="px-2 py-1 bg-white border border-blue-300 rounded font-mono text-xs">Ctrl/Cmd + N</kbd>
-              <span className="text-blue-800">Add new row</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <kbd className="px-2 py-1 bg-white border border-blue-300 rounded font-mono text-xs">Ctrl/Cmd + S</kbd>
-              <span className="text-blue-800">Save first unsaved row</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <kbd className="px-2 py-1 bg-white border border-blue-300 rounded font-mono text-xs">?</kbd>
-              <span className="text-blue-800">Toggle shortcuts</span>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {(error || submitError) && (
         <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
@@ -514,24 +346,6 @@ export default function InventoryDataEntry() {
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]">
                 Product *
               </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                Variant Name *
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                UOM
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Value
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Price
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Offer
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Quantity
-              </th>
               <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]">
                 Actions
               </th>
@@ -540,10 +354,10 @@ export default function InventoryDataEntry() {
           <tbody className="bg-white divide-y divide-gray-200">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={3} className="px-6 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <div className="text-lg font-medium">No inventory data yet</div>
-                    <p className="text-sm">Click "Add New Row" or press Ctrl/Cmd + N to start adding inventory</p>
+                    <p className="text-sm">Click "Add New Row" to start adding inventory</p>
                   </div>
                 </td>
               </tr>
@@ -664,85 +478,13 @@ export default function InventoryDataEntry() {
                       </select>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.variant_name}
-                      onChange={(e) => updateRow(row.id, 'variant_name', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Variant Name"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      value={row.uom}
-                      onChange={(e) => updateRow(row.id, 'uom', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      disabled={!row.isNew}
-                    >
-                      <option value="">Select UOM</option>
-                      <option value="GM">GM</option>
-                      <option value="Pack">Pack</option>
-                      <option value="kg">kg</option>
-                      <option value="Piece">Piece</option>
-                      <option value="Box">Box</option>
-                      <option value="Bag">Bag</option>
-                      <option value="Dozen">Dozen</option>
-                    </select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.value}
-                      onChange={(e) => updateRow(row.id, 'value', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Value"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.price || ''}
-                      onChange={(e) => updateRow(row.id, 'price', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      step="1"
-                      min="0"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.offer || ''}
-                      onChange={(e) => updateRow(row.id, 'offer', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      step="1"
-                      min="0"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.quantity || ''}
-                      onChange={(e) => updateRow(row.id, 'quantity', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      min="0"
-                      disabled={!row.isNew}
-                    />
-                  </td>
                   <td className="px-3 py-2 text-center sticky right-0 bg-white">
                     <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={() => saveRow(row)}
                         disabled={saving === row.id || submitLoading}
                         className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                        title="Save (Ctrl/Cmd + S)"
+                        title="Save"
                       >
                         <Save className="w-4 h-4" />
                       </button>
@@ -777,7 +519,7 @@ export default function InventoryDataEntry() {
           Total Batches: <span className="font-medium text-gray-900">{rows.length}</span>
         </div>
         <div className="text-xs text-gray-500">
-          * Required fields | Ctrl/Cmd + N to add row | Ctrl/Cmd + S to save | ? for shortcuts
+          * Required fields
         </div>
       </div>
     </div>
