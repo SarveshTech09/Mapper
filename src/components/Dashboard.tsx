@@ -1,26 +1,17 @@
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Package, ClipboardList, Boxes, LogOut, TrendingUp, AlertTriangle, Calendar, BarChart3, Plus, ShoppingCart, Database, Archive, Info } from 'lucide-react';
+import { Package, ClipboardList, Boxes, LogOut, TrendingUp, AlertTriangle, Calendar, Plus, Database, Archive, Keyboard } from 'lucide-react';
 import { useAuth } from '../context/AuthProvider';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import useBrands from '../hooks/useBrands';
-import useProductsByBrand from '../hooks/useProductsByBrand';
+import { useCategories } from '../hooks/useCategories';
+import { useUserData } from '../hooks/useUserData';
+import KeyboardShortcutsDrawer from './KeyboardShortcutsDrawer';
 
 const NAV_TABS = [
   { path: '/',          label: 'Dashboard View',       icon: ClipboardList },
   { path: '/inventory', label: 'Batch Data Entry',     icon: Package       },
   { path: '/products',  label: 'Product Master Entry', icon: Boxes         },
 ];
-
-interface Product {
-  id: string;
-  product_name: string;
-  brand_name: string | null;
-  category: string | null;
-  sub_category: string | null;
-  prescription_required: boolean;
-  status: string;
-  created_at: string;
-}
 
 interface Batch {
   id: string;
@@ -35,31 +26,94 @@ interface Batch {
 }
 
 const Dashboard = () => {
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  
+  const dashboardShortcuts = [
+    { key: 'Ctrl/Cmd + K', description: 'Toggle shortcuts' },
+    { key: '?', description: 'Toggle shortcuts' },
+    { key: 'Esc', description: 'Close panels/blur focus' },
+    { key: 'D', description: 'Go to Dashboard view' },
+    { key: 'I', description: 'Go to Inventory view' },
+    { key: 'P', description: 'Go to Products view' },
+    { key: 'L', description: 'Logout' },
+  ];
+
   const { logout } = useAuth();
   const navigate   = useNavigate();
   const location   = useLocation();
-  const [products, setProducts] = useState<Product[]>([]);
+  
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+  
+  const handleKeyboardShortcut = useCallback((e: KeyboardEvent) => {
+    // Prevent shortcuts from firing when typing in input fields
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      setShowShortcuts(prev => !prev);
+    }
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      setShowShortcuts(prev => !prev);
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      // Close shortcuts panel if open
+      if (showShortcuts) {
+        setShowShortcuts(false);
+      }
+      // Blur current input focus
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    }
+    if (e.key.toLowerCase() === 'd' && e.altKey) {
+      e.preventDefault();
+      navigate('/');
+    }
+    if (e.key.toLowerCase() === 'i' && e.altKey) {
+      e.preventDefault();
+      navigate('/inventory');
+    }
+    if (e.key.toLowerCase() === 'p' && e.altKey) {
+      e.preventDefault();
+      navigate('/products');
+    }
+    if (e.key.toLowerCase() === 'l' && e.altKey) {
+      e.preventDefault();
+      handleLogout();
+    }
+  }, [showShortcuts, navigate, handleLogout]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyboardShortcut);
+    return () => window.removeEventListener('keydown', handleKeyboardShortcut);
+  }, [handleKeyboardShortcut]);
+  
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [brandsLoaded, setBrandsLoaded] = useState(false);
-  
   const { brands, brandsLoading, brandsError, fetchBrands } = useBrands();
-  const { productsError, fetchProducts } = useProductsByBrand();
+  const { userData, loading: userDataLoading } = useUserData();
+  const { categories, loading: categoriesLoading } = useCategories(
+    userData?.business_id || null, 
+    userData?.sub_category_id || null
+  );
 
   useEffect(() => {
     loadData();
   }, []);
 
-  useEffect(() => {
-    if (brands.length > 0 && !brandsLoaded) {
-      loadAllProducts();
-    }
-  }, [brands, brandsLoaded]);
-
   // Retry loading brands when user data becomes available
   useEffect(() => {
     const retryBrands = async () => {
-      if (!brandsLoaded && brands.length === 0 && !brandsError) {
+      if (!brandsLoaded && brands.length === 0 && !brandsError && userData && !userDataLoading) {
         try {
           await fetchBrands();
           setBrandsLoaded(true);
@@ -69,10 +123,8 @@ const Dashboard = () => {
       }
     };
     
-    // Retry after a short delay
-    const timer = setTimeout(retryBrands, 2000);
-    return () => clearTimeout(timer);
-  }, [brandsError, brandsLoaded]);
+    retryBrands();
+  }, [userData, userDataLoading, brandsError, brandsLoaded]);
 
   const loadData = async () => {
     try {
@@ -82,13 +134,10 @@ const Dashboard = () => {
       const storedBatches = JSON.parse(localStorage.getItem('batches') || '[]');
       setBatches(storedBatches);
       
-      // Try to fetch brands, but don't block if user data isn't ready
-      try {
+      // Fetch brands if user data is available
+      if (userData && !userDataLoading) {
         await fetchBrands();
         setBrandsLoaded(true);
-      } catch (err) {
-        console.warn('Could not load brands yet:', err);
-        // Continue without brands for now
       }
     } catch (err) {
       console.error('Error loading data:', err);
@@ -97,45 +146,6 @@ const Dashboard = () => {
     }
   };
 
-  const loadAllProducts = async () => {
-    try {
-      const allProducts: Product[] = [];
-      
-      // Fetch products for each brand
-      for (const brand of brands) {
-        try {
-          const productNames = await fetchProducts({ brand_name: brand });
-          
-          // Create product objects from names
-          productNames.forEach((name, index) => {
-            allProducts.push({
-              id: `${brand}-${index}`,
-              product_name: name,
-              brand_name: brand,
-              category: 'General', // Default category
-              sub_category: 'Unknown',
-              prescription_required: false,
-              status: 'active',
-              created_at: new Date().toISOString()
-            });
-          });
-        } catch (err) {
-          console.error(`Error fetching products for brand ${brand}:`, err);
-        }
-      }
-      
-      setProducts(allProducts);
-    } catch (err) {
-      console.error('Error loading all products:', err);
-    }
-  };
-
-  // Calculate dashboard metrics
-  const totalProducts = products.length;
-  const totalBatches = batches.length;
-  const totalStockValue = batches.reduce((sum, batch) => sum + (batch.current_stock_qty * batch.mrp), 0);
-  
-  // Low stock items (less than 10 units)
   const lowStockItems = batches.filter(batch => batch.current_stock_qty < 10).length;
   
   // Expiring soon (within 3 months)
@@ -153,34 +163,12 @@ const Dashboard = () => {
     return new Date(batch.expiry_date) < new Date();
   }).length;
   
-  // Categories breakdown
-  const categories = [...new Set(products.map(p => p.category).filter(Boolean))] as string[];
-  
-  // Cold storage items
-  const coldStorageItems = batches.filter(batch => batch.cold_storage).length;
-  
-  // Recently added (last 7 days)
-  const recentProducts = products.filter(product => {
-    const created = new Date(product.created_at);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    return created >= weekAgo;
-  }).length;
-  
-  const recentBatches = batches.filter(batch => {
-    const created = new Date(batch.created_at);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    return created >= weekAgo;
-  }).length;
-  
-  // Loading state combining all data sources
-  const isLoading = loading || brandsLoading;
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  
+  const isLoading = loading || userDataLoading || brandsLoading || categoriesLoading;
+  
+  const totalBrands = brands.length;
+  const totalCategories = categories.length;
 
   const StatCard = ({ 
     title, 
@@ -275,9 +263,7 @@ const Dashboard = () => {
       );
     }
     
-    // Show error only if it's a real error, not just waiting for data
-    const showError = (brandsError && !brandsError.includes('Waiting for user data') && !brandsError.includes('User data not available')) || 
-                     (productsError && !productsError.includes('Waiting for user data'));
+    const showError = brandsError && !brandsError.includes('Waiting for user data') && !brandsError.includes('User data not available');
     
     if (showError) {
       return (
@@ -286,7 +272,7 @@ const Dashboard = () => {
             <AlertTriangle className="w-16 h-16 mx-auto" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Data</h3>
-          <p className="text-gray-600 mb-4">{brandsError || productsError}</p>
+          <p className="text-gray-600 mb-4">{brandsError}</p>
           <button
             onClick={loadData}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -305,47 +291,19 @@ const Dashboard = () => {
             Dashboard Overview
           </h2>
           
-          {/* Show info message when no data is available yet */}
-          {(products.length === 0 && batches.length === 0) && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Info className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-blue-800">Getting Started</p>
-                  <p className="text-blue-600 text-sm">Add products and batches to see dashboard metrics. The dashboard will populate automatically once you add inventory data.</p>
-                </div>
-              </div>
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
             <StatCard 
-              title="Total Products" 
-              value={totalProducts} 
+              title="Total Brands" 
+              value={totalBrands} 
               icon={Boxes} 
               color="blue" 
-              trend="+12% from last month"
             />
+
             <StatCard 
-              title="Total Batches" 
-              value={totalBatches} 
-              icon={Package} 
-              color="green" 
-              trend="+8% from last month"
-            />
-            <StatCard 
-              title="Stock Value" 
-              value={`₹${totalStockValue.toLocaleString()}`} 
-              icon={ShoppingCart} 
-              color="purple" 
-              trend="↑ 15% increase"
-            />
-            <StatCard 
-              title="Categories" 
-              value={categories.length} 
+              title="Total Categories" 
+              value={totalCategories} 
               icon={Database} 
-              color="orange" 
+              color="purple" 
             />
           </div>
         </div>
@@ -423,68 +381,6 @@ const Dashboard = () => {
             />
           </div>
         </div>
-
-        {/* Additional Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="gradient-card rounded-2xl p-6 shadow-lg border border-white/30">
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-blue-500" />
-              Storage Overview
-            </h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-white/50 rounded-lg">
-                <span className="text-gray-700">Cold Storage Items</span>
-                <span className="font-semibold text-blue-600">{coldStorageItems}</span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-white/50 rounded-lg">
-                <span className="text-gray-700">Normal Storage Items</span>
-                <span className="font-semibold text-green-600">{batches.length - coldStorageItems}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="gradient-card rounded-2xl p-6 shadow-lg border border-white/30">
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-purple-500" />
-              Recent Activity
-            </h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-white/50 rounded-lg">
-                <span className="text-gray-700">New Products (7 days)</span>
-                <span className="font-semibold text-purple-600">{recentProducts}</span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-white/50 rounded-lg">
-                <span className="text-gray-700">New Batches (7 days)</span>
-                <span className="font-semibold text-orange-600">{recentBatches}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Categories Overview */}
-        {categories.length > 0 && (
-          <div className="gradient-card rounded-2xl p-6 shadow-lg border border-white/30">
-            <h3 className="font-semibold text-gray-900 mb-4">Categories Distribution</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {categories.map((category, index) => {
-                const categoryProducts = products.filter(p => p.category === category).length;
-                const colors = ['bg-blue-100', 'bg-green-100', 'bg-purple-100', 'bg-orange-100', 'bg-yellow-100', 'bg-pink-100'];
-                const textColors = ['text-blue-800', 'text-green-800', 'text-purple-800', 'text-orange-800', 'text-yellow-800', 'text-pink-800'];
-                
-                return (
-                  <div 
-                    key={category} 
-                    className={`p-4 rounded-xl ${colors[index % colors.length]} border border-white/50`}
-                  >
-                    <p className={`font-semibold ${textColors[index % textColors.length]} mb-1`}>{category}</p>
-                    <p className="text-2xl font-bold text-gray-900">{categoryProducts}</p>
-                    <p className="text-xs text-gray-600 mt-1">products</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -557,18 +453,27 @@ const Dashboard = () => {
                 );
               })}
             </nav>
+            {(location.pathname === '/inventory' || location.pathname === '/products') && (
+              <button
+                onClick={() => setShowShortcuts(!showShortcuts)}
+                className="absolute top-4 right-4 p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200 hover:scale-110"
+                title="Keyboard shortcuts (Press ?)"
+              >
+                <Keyboard className="w-5 h-5" />
+              </button>
+            )}
           </div>
 
           <div className="p-6 md:p-8 bg-white/30">
             {location.pathname === '/' ? renderDashboardContent() : <Outlet />}
           </div>
         </div>
-
-        <div className="mt-6 text-center text-sm text-gray-600 bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
-          <p className="font-medium">Healthcare Inventory Management System</p>
-          <p className="text-xs text-gray-500 mt-1">Powered by Waqin</p>
-        </div>
       </div>
+      <KeyboardShortcutsDrawer 
+        isOpen={showShortcuts} 
+        onClose={() => setShowShortcuts(false)} 
+        shortcuts={dashboardShortcuts} 
+      />
     </div>
   );
 };

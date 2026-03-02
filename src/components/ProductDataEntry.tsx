@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Plus, Save, X, AlertCircle, Check, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, Save, X, AlertCircle, Check, Trash2, } from "lucide-react";
 import ReactSelect from "react-select";
 import CreatableSelect from "react-select/creatable";
 import { useUserData } from "../hooks/useUserData";
@@ -8,6 +8,7 @@ import { useSubCategories } from "../hooks/useSubCategories";
 import useBrands from "../hooks/useBrands";
 import useProductsByBrand from "../hooks/useProductsByBrand";
 import useAddProducts from "../hooks/useAddProducts";
+import DescriptionModal from "./DescriptionModal";
 
 interface OptionType {
   value: string;
@@ -38,6 +39,69 @@ export default function ProductDataEntry() {
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+  const [currentRowId, setCurrentRowId] = useState<string | null>(null);
+  const [currentDescription, setCurrentDescription] = useState('');
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  
+  const handleKeyboardShortcut = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      addNewRow();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      const firstNewRow = rows.find(r => r.isNew);
+      if (firstNewRow) {
+        saveRow(firstNewRow);
+      }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      saveAllRows();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      setShowShortcuts(prev => !prev);
+    }
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      setShowShortcuts(prev => !prev);
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      e.preventDefault();
+      const firstInput = document.querySelector('input, select') as HTMLElement;
+      if (firstInput) {
+        firstInput.focus();
+      }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault();
+      const activeElement = document.activeElement as HTMLInputElement;
+      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+        activeElement.select();
+      }
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (showShortcuts) {
+        setShowShortcuts(false);
+      }
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    }
+  }, [rows, showShortcuts]);
+  
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyboardShortcut);
+    return () => window.removeEventListener('keydown', handleKeyboardShortcut);
+  }, [handleKeyboardShortcut]);
 
   const { userData, loading: userLoading, error: userError } = useUserData();
   const businessId = userData?.business_id || null;
@@ -376,7 +440,8 @@ export default function ProductDataEntry() {
   const filteredRows = rows;
 
   return (
-    <div className="space-y-4">
+    <>
+      <div className="space-y-4">
       <style>{`
         @keyframes gradientMove {
           0% { background-position: 0% 50%; }
@@ -882,15 +947,24 @@ export default function ProductDataEntry() {
                     </select>
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.description}
-                      onChange={(e) =>
-                        updateRow(row.id, "description", e.target.value)
-                      }
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Description"
-                    />
+                    <button
+                      onClick={() => {
+                        setCurrentRowId(row.id);
+                        setCurrentDescription(row.description || '');
+                        setShowDescriptionModal(true);
+                      }}
+                      className="w-full px-2 py-1.5 text-left border border-gray-300 rounded text-sm hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    >
+                      {row.description ? (
+                        <span className="text-gray-800 truncate block">
+                          {row.description.replace(/<[^>]*>/g, '').length > 30
+                            ? `${row.description.replace(/<[^>]*>/g, '').substring(0, 30)}...`
+                            : row.description.replace(/<[^>]*>/g, '')}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 italic">Add description...</span>
+                      )}
+                    </button>
                   </td>
 
                   <td className="px-3 py-2 text-center">
@@ -952,6 +1026,20 @@ export default function ProductDataEntry() {
           <span>Click Save icon to save each row</span>
         </div>
       </div>
+
+      <DescriptionModal
+        isOpen={showDescriptionModal}
+        onClose={() => setShowDescriptionModal(false)}
+        onSave={(description) => {
+          if (currentRowId) {
+            updateRow(currentRowId, "description", description);
+            setSuccess("Description updated successfully");
+            setTimeout(() => setSuccess(null), 3000);
+          }
+        }}
+        initialDescription={currentDescription}
+      />
     </div>
+    </>
   );
 }

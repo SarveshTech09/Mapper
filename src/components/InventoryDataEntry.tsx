@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Save, X, Keyboard, AlertCircle, Check } from 'lucide-react';
+import { useKeyboardShortcuts } from './KeyboardShortcutsDrawer';
+import { Plus, Save, X, AlertCircle, Check } from 'lucide-react';
 import useAddVariants from '../hooks/useAddVariants';
 import useSubmitVariant from '../hooks/useSubmitVariant';
 import { LoadingSpinner } from './ui/StatusMessages';
 import { ParentRow, ChildRow } from './ui/TableRowComponents';
+
 
 interface Product {
   id: number; // Original numeric ID from API
@@ -588,6 +590,15 @@ export default function InventoryDataEntry() {
     }, 5000);
   };
   
+  useKeyboardShortcuts({
+    addNewRow,
+    saveRow,
+    submitAllRows,
+    setShowShortcuts,
+    rows,
+    showShortcuts
+  });
+  
   return (
     <div className="space-y-4">
       <style>{`
@@ -632,66 +643,9 @@ export default function InventoryDataEntry() {
             <Save className="w-5 h-5" />
             Submit All
           </button>
-          <button
-            onClick={() => setShowShortcuts(!showShortcuts)}
-            className="flex items-center gap-2 px-3 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-200 text-sm hover:scale-105"
-            title="Keyboard shortcuts (Press ?)"
-          >
-            <Keyboard className="w-4 h-4" />
-          </button>
         </div>
       </div>
-  
-      {showShortcuts && (
-        <div className="bg-gradient-to-br from-blue-50/50 to-purple-50/30 border border-blue-200/50 rounded-2xl p-5 shadow-lg backdrop-blur-sm">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl">
-                <Keyboard className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="font-semibold text-blue-900 text-lg">Keyboard Shortcuts</h3>
-            </div>
-            <button onClick={() => setShowShortcuts(false)} className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-all duration-200">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl">
-              <kbd className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg font-mono text-xs shadow-sm">Ctrl/Cmd + N</kbd>
-              <span className="text-blue-800 font-medium">Add new row</span>
-            </div>
-            <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl">
-              <kbd className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg font-mono text-xs shadow-sm">Ctrl/Cmd + S</kbd>
-              <span className="text-blue-800 font-medium">Save first unsaved row</span>
-            </div>
-            <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl">
-              <kbd className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg font-mono text-xs shadow-sm">Ctrl/Cmd + Enter</kbd>
-              <span className="text-blue-800 font-medium">Submit all rows</span>
-            </div>
-            <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl">
-              <kbd className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg font-mono text-xs shadow-sm">Ctrl/Cmd + K</kbd>
-              <span className="text-blue-800 font-medium">Toggle shortcuts</span>
-            </div>
-            <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl">
-              <kbd className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg font-mono text-xs shadow-sm">?</kbd>
-              <span className="text-blue-800 font-medium">Toggle shortcuts</span>
-            </div>
-            <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl">
-              <kbd className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg font-mono text-xs shadow-sm">Ctrl/Cmd + D</kbd>
-              <span className="text-blue-800 font-medium">Focus first input</span>
-            </div>
-            <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl">
-              <kbd className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg font-mono text-xs shadow-sm">Ctrl/Cmd + A</kbd>
-              <span className="text-blue-800 font-medium">Select all in field</span>
-            </div>
-            <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl">
-              <kbd className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg font-mono text-xs shadow-sm">Esc</kbd>
-              <span className="text-blue-800 font-medium">Close panels/blur focus</span>
-            </div>
-          </div>
-        </div>
-      )}
-  
+      
       {(error || submitError) && (
         <div className="flex items-center gap-3 p-4 bg-red-50/50 border border-red-200/50 rounded-xl text-red-700 shadow-sm backdrop-blur-sm">
           <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500" />
@@ -699,7 +653,6 @@ export default function InventoryDataEntry() {
           <button 
             onClick={() => {
               setError(null);
-              // Clear submit error if needed
             }} 
             className="ml-auto hover:bg-red-100 p-1 rounded-lg transition-colors"
           >
