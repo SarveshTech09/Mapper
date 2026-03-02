@@ -3,6 +3,8 @@ import { Plus, Save, X, AlertCircle, Check, Trash2, Keyboard } from 'lucide-reac
 import ReactSelect from 'react-select';
 import useAddVariants from '../hooks/useAddVariants';
 import useSubmitVariant from '../hooks/useSubmitVariant';
+import { dummyData } from './data';
+import { accountdetails } from '../hooks/use_dynamci';
 
 
 interface Product {
@@ -30,6 +32,32 @@ interface BatchRow {
   offer: number;
   quantity: number;
   __children?: BatchRow[];
+  // Index signature to allow dynamic fields
+  [key: string]: string | number | boolean | undefined | BatchRow[];
+}
+
+interface FieldType {
+  type: string;
+  name: string;
+  label: string;
+  required?: boolean;
+  values?: ({ value: string; label: string; selected?: boolean } | { value: string })[];
+  className?: string;
+  access?: boolean;
+  subtype?: string;
+  multiple?: boolean;
+  requireValidOption?: boolean;
+  QueryRule?: string;
+  inline?: boolean;
+  other?: boolean;
+  toggle?: boolean;
+  DataType?: string;
+}
+
+interface HeaderConfig {
+  key: string;
+  label: string;
+  className: string;
 }
 
 export default function InventoryDataEntry() {
@@ -51,6 +79,8 @@ export default function InventoryDataEntry() {
     }
   `;
 
+  const [dynamicFields, setDynamicFields] = useState<FieldType[]>([]);
+  const [, setFormLoading] = useState(true);
   const [rows, setRows] = useState<BatchRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,8 +88,6 @@ export default function InventoryDataEntry() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  
-  // Track bulk operation state
   const [bulkOperationActive, setBulkOperationActive] = useState(false);
   
   const {
@@ -76,6 +104,30 @@ export default function InventoryDataEntry() {
   
   const { submitVariant, loading: submitLoading, error: submitError } = useSubmitVariant();
   
+  // Fetch dynamic form configuration
+  useEffect(() => {
+    const fetchFormConfig = async () => {
+      try {
+        const response = await accountdetails('product_description_ayurvedic');
+        if (response.success && response.fields) {
+          setDynamicFields(response.fields);
+        } else {
+          console.error('Failed to fetch form configuration:', response);
+          setDynamicFields(dummyData); // Fallback to hardcoded data
+        }
+      } catch (error) {
+        console.error('Error fetching form configuration:', error);
+        setDynamicFields(dummyData); // Fallback to hardcoded data
+      } finally {
+        setFormLoading(false);
+      }
+    };
+    
+    fetchFormConfig();
+  }, []);
+
+  // Use dynamic fields fetched from API, fallback to dummy data if none loaded yet
+  const currentFields = dynamicFields.length > 0 ? dynamicFields : dummyData;
 
   useEffect(() => {
     loadData();
@@ -141,6 +193,383 @@ export default function InventoryDataEntry() {
   }, [handleKeyboardShortcut]);
 
   const [brands, setBrands] = useState<string[]>([]);
+  
+  // Helper function to render field based on its type
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderField = (field: FieldType, row: BatchRow, updateRow: (id: string, field: keyof BatchRow, value: string | number | boolean | File) => void, _rowIndex?: number, _rowProductsMap?: Record<string, any[]>, _rowLoadingMap?: Record<string, boolean>, brandsLoading?: boolean, setSuccess?: (msg: string | null) => void) => {
+    const actualBrandsLoading = brandsLoading ?? false;
+    const actualSetSuccess = setSuccess ?? (() => {});
+
+    // Map field names from data.tsx to BatchRow interface
+    const fieldMapping: Record<string, keyof BatchRow> = {
+      'brand': 'product_brand',
+      'title': 'product_name',
+      'hsn_no': 'product_brand', // Using product_brand as placeholder
+      'description': 'product_name', // Using product_name as placeholder
+      'gst_percentage': 'product_name' // Using product_name as placeholder
+    };
+
+    const fieldName = (fieldMapping[field.name] || field.name) as keyof BatchRow;
+    const value = row[fieldName];
+
+    switch (field.type) {
+      case 'text':
+      case 'textarea':
+        return (
+          <input
+            type="text"
+            value={value as string || ''}
+            onChange={(e) => updateRow(row.id, fieldName, e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[36px] placeholder-nowrap"
+            placeholder={field.label}
+            {...(field.type === 'textarea' && { as: 'textarea', rows: 3 })}
+          />
+        );
+
+      case 'number':
+        return (
+          <input
+            type="number"
+            value={value as number || ''}
+            onChange={(e) => updateRow(row.id, fieldName, parseFloat(e.target.value) || 0)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[36px] placeholder-nowrap"
+            placeholder={field.label}
+          />
+        );
+
+      case 'select':
+        { 
+          // Special handling for sub_category field to use dynamic options
+          let options: { value: string; label: string }[] = [];
+          if (field.name === 'sub_category' && row.availableSubCategories && Array.isArray(row.availableSubCategories) && row.availableSubCategories.length > 0) {
+            // Handle the type conversion properly
+            options = (row.availableSubCategories as Array<{ value: string; label: string }>).map(item => ({
+              value: item.value,
+              label: item.label
+            }));
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            options = field.values?.map((opt: any) => {
+              // Handle both structures: { value, label } and { value }
+              if (opt && typeof opt === 'object' && 'label' in opt) {
+                return { value: opt.value, label: opt.label };
+              } else {
+                return { value: opt.value, label: opt.value };
+              }
+            }) || [];
+          }
+
+          return (
+            <ReactSelect
+              value={value ? { value: value as string, label: value as string } : null}
+              onChange={(selectedOption: { value: string; label: string } | null) => {
+                // For gst_percentage, we need to pass the raw value (with %) to updateRow
+                // which will then convert it to a number
+                updateRow(row.id, fieldName, selectedOption?.value || '');
+              }}
+              options={options}
+              placeholder={`Select ${field.label.toLowerCase()}...`}
+              className="text-sm"
+              menuPortalTarget={document.body}
+              styles={{
+                control: (provided) => ({
+                  ...provided,
+                  minWidth: 150,
+                  minHeight: 36,
+                }),
+                menuPortal: (provided) => ({
+                  ...provided,
+                  zIndex: 9999,
+                }),
+              }}
+              isSearchable
+              isDisabled={field.name === 'sub_category' && (!row.availableSubCategories || !Array.isArray(row.availableSubCategories) || row.availableSubCategories.length === 0)}
+            />
+          );
+        }
+
+      case 'autocomplete':
+        // Special handling for brand field
+        if (field.name === 'brand') {
+          // Extract brand values from field configuration
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const brandOptions = field.values?.map((opt: any) => {
+            if (opt && typeof opt === 'object' && 'label' in opt) {
+              return { value: opt.value, label: opt.label };
+            } else {
+              return { value: opt.value, label: opt.value };
+            }
+          }) || [];
+          
+          return (
+            <ReactSelect
+              value={value ? { value: value as string, label: value as string } : null}
+              onChange={(selectedOption: { value: string; label: string } | null) => {
+                updateRow(row.id, fieldName, selectedOption?.value || '');
+              }}
+              options={brandOptions}
+              placeholder="Search brand..."
+              className="text-sm"
+              menuPortalTarget={document.body}
+              styles={{
+                control: (provided) => ({
+                  ...provided,
+                  minWidth: 150,
+                  minHeight: 36,
+                }),
+                menuPortal: (provided) => ({
+                  ...provided,
+                  zIndex: 9999,
+                }),
+                valueContainer: (provided) => ({
+                  ...provided,
+                  paddingLeft: 8,
+                  paddingRight: 8,
+                }),
+              }}
+              isSearchable
+              closeMenuOnSelect={true}
+              blurInputOnSelect={true}
+              isLoading={actualBrandsLoading}
+            />
+          );
+        }
+
+        return (
+          <input
+            type="text"
+            value={value as string || ''}
+            onChange={(e) => updateRow(row.id, fieldName, e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[36px] placeholder-nowrap"
+            placeholder={field.label}
+          />
+        );
+
+      case 'radio-group':
+        return (
+          <div className="flex gap-4">
+            {field.values?.map((option, idx: number) => {
+              const optionLabel = 'label' in option ? option.label : option.value;
+              const optionValue = option.value;
+              
+              return (
+                <label key={idx} className="flex items-center gap-1 text-sm">
+                  <input
+                    type="radio"
+                    name={`${field.name}-${row.id}`}
+                    value={optionValue}
+                    checked={value === optionValue}
+                    onChange={(e) => updateRow(row.id, fieldName, e.target.value)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  {optionLabel}
+                </label>
+              );
+            })}
+          </div>
+        );
+
+      case 'checkbox-group':
+        return (
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={(e) => updateRow(row.id, fieldName, e.target.checked ? 1 : 0)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+          </div>
+        );
+
+      case 'file': {
+        const hasImage = value && (typeof value === 'string' || (value && typeof value === 'object' && 'name' in value && 'size' in value && 'type' in value));
+        return (
+          <label
+            className={`flex flex-row items-center justify-center w-full h-[36px] border-2 border-dashed rounded cursor-pointer transition-colors gap-1.5 px-2 ${hasImage ? "border-green-400 bg-green-50 hover:bg-green-100" : "border-gray-300 hover:border-blue-400 hover:bg-blue-50"}`}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const file = e.dataTransfer.files[0];
+              if (!file) return;
+              if (typeof file !== 'object' || !('type' in file) || !('size' in file)) return;
+              if (!['image/jpeg', 'image/png'].includes(file.type as string)) {
+                alert('Only JPG / PNG allowed');
+                return;
+              }
+              if ((file.size as unknown as number) > 1 * 1024 * 1024) {
+                alert('Max size is 1 MB');
+                return;
+              }
+              updateRow(row.id, fieldName, file as File);
+              actualSetSuccess("Image uploaded successfully");
+              setTimeout(() => actualSetSuccess(null), 3000);
+            }}
+          >
+            {hasImage ? (
+              <>
+                <svg
+                  className="w-4 h-4 text-green-500 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <svg
+                  className="w-4 h-4 text-green-600 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <rect
+                    x="3"
+                    y="3"
+                    width="18"
+                    height="18"
+                    rx="2"
+                    ry="2"
+                    strokeWidth={1.5}
+                  />
+                  <circle
+                    cx="8.5"
+                    cy="8.5"
+                    r="1.5"
+                    strokeWidth={1.5}
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M21 15l-5-5L5 21"
+                  />
+                </svg>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-4 h-4 text-gray-400 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M4 16l4-4m0 0l4 4m-4-4v9M20 16l-4-4m0 0l-4 4m4-4V3"
+                  />
+                </svg>
+                <span className="text-[11px] text-gray-500">
+                  Click or drag image
+                </span>
+              </>
+            )}
+            <input
+              type="file"
+              accept="image/jpeg,image/png"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (typeof file !== 'object' || !('type' in file) || !('size' in file)) return;
+                if (!['image/jpeg', 'image/png'].includes(file.type as string)) {
+                  alert('Only JPG / PNG allowed');
+                  return;
+                }
+                if ((file.size as unknown as number) > 1 * 1024 * 1024) {
+                  alert('Max size is 1 MB');
+                  return;
+                }
+                updateRow(row.id, fieldName, file as File);
+                actualSetSuccess("Image uploaded successfully");
+                setTimeout(() => actualSetSuccess(null), 3000);
+              }}
+            />
+          </label>
+        );
+      }
+
+      default:
+        return (
+          <input
+            type="text"
+            value={value as string || ''}
+            onChange={(e) => updateRow(row.id, fieldName, e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[36px] placeholder-nowrap"
+            placeholder={field.label}
+          />
+        );
+    }
+  };
+  
+  // Helper function to generate dynamic headers
+  const generateDynamicHeaders = (fields: FieldType[]): HeaderConfig[] => {
+    const headers: HeaderConfig[] = [];
+    
+    // Add static headers for brand and product first
+    headers.push({ 
+      key: 'brand', 
+      label: 'Brand', 
+      className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]' 
+    });
+    headers.push({ 
+      key: 'product', 
+      label: 'Product *', 
+      className: 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]' 
+    });
+    
+    // Process remaining dynamic fields
+    fields.forEach((field) => {
+      // Skip brand and title fields since they're handled separately
+      if (field.name === 'brand' || field.name === 'title') {
+        return;
+      }
+      
+      let label = field.label;
+      const key = field.name;
+      let className = 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider';
+
+      // Add required indicator
+      if (field.required) {
+        label += ' *';
+      }
+
+      // Set specific widths based on field name
+      const widthMap: Record<string, string> = {
+        'category': 'min-w-[120px]',
+        'sub_category': 'min-w-[120px]',
+        'hsn_no': 'min-w-[100px]',
+        'gst_percentage': 'min-w-[80px]',
+        'employee_percentage': 'min-w-[120px]',
+        'prescription_required': 'min-w-[120px]',
+        'is_inventory': 'min-w-[120px]',
+        'description': 'min-w-[200px]'
+      };
+
+      const widthClass = widthMap[field.name] || 'min-w-[150px]';
+      className += ` ${widthClass}`;
+
+      headers.push({
+        key,
+        label,
+        className
+      });
+    });
+
+    // Add actions column at the very end
+    headers.push({
+      key: 'actions',
+      label: 'Actions',
+      className: 'px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]'
+    });
+
+    return headers;
+  };
   
   const loadData = async () => {
     try {
@@ -213,6 +642,7 @@ export default function InventoryDataEntry() {
       }
       
       // Transform to Product format - use original numeric ID directly
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const transformedProducts: Product[] = brandProducts.map((product: any) => ({
         id: product.id, // Original numeric ID from API
         product_name: product.product_name || product.title || product.name || '',
@@ -284,6 +714,7 @@ export default function InventoryDataEntry() {
     });
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateRow = (id: string, field: keyof BatchRow, value: any) => {
     setRows(rows.map(row => {
       // Handle parent row updates
@@ -463,11 +894,11 @@ export default function InventoryDataEntry() {
       // Mock API call
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      setSuccess('Batch deleted successfully');
+      setSuccess('Row deleted successfully');
       await loadData();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete batch');
+      setError(err instanceof Error ? err.message : 'Failed to delete row');
     }
   };
   
@@ -708,42 +1139,23 @@ export default function InventoryDataEntry() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0">
             <tr>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                Brand
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[200px]">
-                Product *
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                Variant Name *
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[120px]">
-                UOM
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Value
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Price
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Offer
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[100px]">
-                Quantity
-              </th>
-              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]">
-                Actions
-              </th>
+              {generateDynamicHeaders(currentFields).map((header) => (
+                <th 
+                  key={header.key}
+                  className={header.className}
+                >
+                  {header.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={3} className="px-6 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <div className="text-lg font-medium">No inventory data yet</div>
-                    <p className="text-sm">Click "Add New Row" or press Ctrl/Cmd + N to start adding inventory</p>
+                    <p className="text-sm">Click "Add New Row" to start adding inventory</p>
                   </div>
                 </td>
               </tr>
@@ -751,6 +1163,7 @@ export default function InventoryDataEntry() {
               rows.flatMap((row) => [
                 // Parent row
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : 'hover:bg-gray-50'} transition-colors`}>
+                  {/* Static Brand column */}
                   <td className="px-3 py-2">
                     {row.isNew ? (
                       <ReactSelect
@@ -806,6 +1219,8 @@ export default function InventoryDataEntry() {
                       </select>
                     )}
                   </td>
+                  
+                  {/* Static Product column */}
                   <td className="px-3 py-2">
                     {row.isNew ? (
                       <ReactSelect
@@ -865,78 +1280,20 @@ export default function InventoryDataEntry() {
                       </select>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.variant_name}
-                      onChange={(e) => updateRow(row.id, 'variant_name', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Variant Name"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      value={row.uom}
-                      onChange={(e) => updateRow(row.id, 'uom', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      disabled={!row.isNew}
-                    >
-                      <option value="">Select UOM</option>
-                      <option value="GM">GM</option>
-                      <option value="Pack">Pack</option>
-                      <option value="kg">kg</option>
-                      <option value="Piece">Piece</option>
-                      <option value="Box">Box</option>
-                      <option value="Bag">Bag</option>
-                      <option value="Dozen">Dozen</option>
-                    </select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={row.value}
-                      onChange={(e) => updateRow(row.id, 'value', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Value"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.price || ''}
-                      onChange={(e) => updateRow(row.id, 'price', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      step="1"
-                      min="0"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.offer || ''}
-                      onChange={(e) => updateRow(row.id, 'offer', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      step="1"
-                      min="0"
-                      disabled={!row.isNew}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      value={row.quantity || ''}
-                      onChange={(e) => updateRow(row.id, 'quantity', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                      min="0"
-                      disabled={!row.isNew}
-                    />
-                  </td>
+                  
+                  {/* Dynamic columns */}
+                  {(() => {
+                    // Filter out 'brand' and 'title'/'product' from dynamic fields since they're handled separately
+                    const dynamicFieldsFiltered = currentFields.filter(field => field.name !== 'brand' && field.name !== 'title');
+                    
+                    return dynamicFieldsFiltered.map((field) => (
+                      <td key={field.name} className="px-3 py-2">
+                        {renderField(field, row, updateRow, undefined, undefined, undefined, brandsLoading, setSuccess)}
+                      </td>
+                    ));
+                  })()}
+                  
+                  {/* Actions column */}
                   <td className="px-3 py-2 text-center sticky right-0 bg-white">
                     <div className="flex items-center justify-center gap-2">
                       <button
@@ -981,78 +1338,20 @@ export default function InventoryDataEntry() {
                     <td className="px-3 py-2 text-sm text-gray-600 font-medium italic bg-green-50" colSpan={2}>
                       Child Variant
                     </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={child.variant_name}
-                        onChange={(e) => updateRow(child.id, 'variant_name', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                        placeholder="Variant Details"
-                        disabled={!child.isNew}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={child.uom}
-                        onChange={(e) => updateRow(child.id, 'uom', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                        disabled={!child.isNew}
-                      >
-                        <option value="">Select UOM</option>
-                        <option value="GM">GM</option>
-                        <option value="Pack">Pack</option>
-                        <option value="kg">kg</option>
-                        <option value="Piece">Piece</option>
-                        <option value="Box">Box</option>
-                        <option value="Bag">Bag</option>
-                        <option value="Dozen">Dozen</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={child.value}
-                        onChange={(e) => updateRow(child.id, 'value', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                        placeholder="Value"
-                        disabled={!child.isNew}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={child.price || ''}
-                        onChange={(e) => updateRow(child.id, 'price', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                        placeholder="0"
-                        step="1"
-                        min="0"
-                        disabled={!child.isNew}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={child.offer || ''}
-                        onChange={(e) => updateRow(child.id, 'offer', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                        placeholder="0"
-                        step="1"
-                        min="0"
-                        disabled={!child.isNew}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={child.quantity || ''}
-                        onChange={(e) => updateRow(child.id, 'quantity', e.target.value ? parseInt(e.target.value) || 0 : 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-green-50"
-                        placeholder="0"
-                        min="0"
-                        disabled={!child.isNew}
-                      />
-                    </td>
+                    
+                    {/* Dynamic columns for child */}
+                    {(() => {
+                      // Filter out 'brand' and 'title'/'product' from dynamic fields since they're handled separately
+                      const dynamicFieldsFiltered = currentFields.filter(field => field.name !== 'brand' && field.name !== 'title');
+                      
+                      return dynamicFieldsFiltered.map((field) => (
+                        <td key={field.name} className="px-3 py-2">
+                          {renderField(field, child, updateRow, undefined, undefined, undefined, brandsLoading, setSuccess)}
+                        </td>
+                      ));
+                    })()}
+                    
+                    {/* Actions column for child */}
                     <td className="px-3 py-2 text-center sticky right-0 bg-green-50">
                       <div className="flex items-center justify-center gap-2">
                         <button
