@@ -7,6 +7,7 @@ import { dummyData } from './data';
 import { accountdetails } from '../hooks/use_dynamci';
 
 
+
 interface VariantData {
   product_name: string;
   uom: string;
@@ -24,6 +25,7 @@ interface Product {
   has_variants: boolean;
   variant_type?: string;
 }
+
 
 interface FieldType {
   type: string;
@@ -112,6 +114,28 @@ export default function InventoryDataEntry() {
     fetchFormConfig();
   }, []);
 
+  // Fetch dynamic form configuration
+  useEffect(() => {
+    const fetchFormConfig = async () => {
+      try {
+        const response = await accountdetails('product_description_ayurvedic');
+        if (response.success && response.fields) {
+          setDynamicFields(response.fields);
+        } else {
+          console.error('Failed to fetch form configuration:', response);
+          setDynamicFields(dummyData); // Fallback to hardcoded data
+        }
+      } catch (error) {
+        console.error('Error fetching form configuration:', error);
+        setDynamicFields(dummyData); // Fallback to hardcoded data
+      } finally {
+        setFormLoading(false);
+      }
+    };
+    
+    fetchFormConfig();
+  }, []);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -122,6 +146,7 @@ export default function InventoryDataEntry() {
   const [brands, setBrands] = useState<string[]>([]);
   
   const loadData = async () => {
+    
     
     try {
       setLoading(true);
@@ -606,6 +631,7 @@ export default function InventoryDataEntry() {
       
       // Transform to Product format - use original numeric ID directly
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const transformedProducts: Product[] = brandProducts.map((product: any) => ({
         id: product.id, // Original numeric ID from API
         product_name: product.product_name || product.title || product.name || '',
@@ -640,6 +666,15 @@ export default function InventoryDataEntry() {
       quantity: 0,
       __children: []
     };
+    
+    // Initialize dynamic fields to empty strings
+    
+    // Add dynamic fields to new row (excluding brand and title)
+    currentFields.forEach(field => {
+      if (!(field.name in newRow) && field.name !== 'brand' && field.name !== 'title') {
+        newRow[field.name] = '';
+      }
+    });
     
     // Initialize dynamic fields to empty strings
     
@@ -1015,6 +1050,7 @@ export default function InventoryDataEntry() {
 
 
 
+
       {(error || submitError) && (
         <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -1145,16 +1181,21 @@ export default function InventoryDataEntry() {
                         menuPortalTarget={document.body}
                         styles={{
                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           control: (provided: any) => ({
                             ...provided,
                             minWidth: 200,
                             minHeight: 36,
                           }),
                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                         
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           menuPortal: (provided: any) => ({
                             ...provided,
                             zIndex: 9999,
                           }),
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                         
                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           valueContainer: (provided: any) => ({
                             ...provided,
