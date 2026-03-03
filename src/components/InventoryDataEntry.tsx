@@ -92,7 +92,7 @@ export default function InventoryDataEntry() {
   } = useAddVariants();
   
   const { loading: submitLoading, error: submitError } = useSubmitVariant();
-  const { submitBulkData, submitSingleData, loading: bulkLoading, error: bulkError } = useBulkSubmit();
+  const { submitBulkData, loading: bulkLoading, error: bulkError } = useBulkSubmit();
 
   useEffect(() => {
     const fetchFormConfig = async () => {
@@ -122,7 +122,7 @@ export default function InventoryDataEntry() {
   const currentFields = dynamicFields.length > 0 ? dynamicFields : dummyData;
   const [saving, setSaving] = useState<string | null>(null);
   
-  const saveRow = async (row: BatchRow, isChild: boolean = false, parentId?: string, skipReload: boolean = false) => {
+  const saveRow = async (row: BatchRow, isChild: boolean = false, parentId?: string, skipReload: boolean = false, saveChildren: boolean = false) => {
     let productInfo = row;
     
     if (isChild && parentId) {
@@ -157,29 +157,131 @@ export default function InventoryDataEntry() {
     setError(null);
 
     try {
+      // Build payload with proper field mapping for dynamic fields
       const payload: any = {
         product_name: productInfo.variant_name || productInfo.product_name,
         uom: productInfo.uom || 'Piece',
         value: productInfo.value || '1',
-        mrp: productInfo.price?.toString() || '0',
-        sell_price: productInfo.offer?.toString() || productInfo.price?.toString() || '0',
+        mrp: '0',
+        sell_price: '0',
         available_quantity: productInfo.quantity?.toString() || '0',
         product_id: productInfo.product_id
       };
 
+      // Handle MRP and sell_price mapping - check both dynamic field names and hardcoded ones
+      const mrpValue = productInfo.mrp || productInfo.price;
+      const sellPriceValue = productInfo.sell_price || productInfo.offer || productInfo.mrp || productInfo.price;
+      
+      payload.mrp = (mrpValue !== undefined && mrpValue !== null && mrpValue !== '') ? mrpValue.toString() : '0';
+      payload.sell_price = (sellPriceValue !== undefined && sellPriceValue !== null && sellPriceValue !== '') ? sellPriceValue.toString() : '0';
+
+      // Process all dynamic fields
       currentFields.forEach(field => {
-        if (field.name in productInfo && !['product_name', 'product_brand', 'uom', 'value', 'mrp', 'sell_price', 'available_quantity', 'product_id', 'variant_name', 'price', 'offer', 'quantity'].includes(field.name)) {
-          payload[field.name] = productInfo[field.name as keyof BatchRow] as string;
+        // Skip fields we've already handled explicitly
+        const handledFields = ['product_name', 'product_brand', 'uom', 'value', 'available_quantity', 'product_id', 'variant_name', 'quantity'];
+        if (handledFields.includes(field.name)) {
+          return;
+        }
+        
+        // Handle MRP and sell_price fields specifically
+        if (field.name === 'mrp') {
+          const mrpFieldValue = productInfo[field.name as keyof BatchRow];
+          if (mrpFieldValue !== undefined && mrpFieldValue !== null && mrpFieldValue !== '') {
+            payload.mrp = mrpFieldValue.toString();
+          }
+        } else if (field.name === 'sell_price') {
+          const sellPriceFieldValue = productInfo[field.name as keyof BatchRow];
+          if (sellPriceFieldValue !== undefined && sellPriceFieldValue !== null && sellPriceFieldValue !== '') {
+            payload.sell_price = sellPriceFieldValue.toString();
+          }
+        } else if (field.name in productInfo) {
+          // Handle all other dynamic fields
+          const fieldValue = productInfo[field.name as keyof BatchRow];
+          if (fieldValue !== undefined && fieldValue !== null && fieldValue !== '') {
+            payload[field.name] = fieldValue.toString();
+          }
         }
       });
       
       console.log('Submitting variant:', payload);
       
-      const result = await submitSingleData(payload);
+      // Use bulk API for single variant submission to maintain consistency
+      let bulkPayload;
+      
+      if (saveChildren && row.__children && row.__children.length > 0) {
+        // Save parent and all children
+        const allVariants = [payload, ...row.__children.map(child => {
+          const childPayload: any = {
+            product_name: child.variant_name || child.product_name,
+            uom: child.uom || 'Piece',
+            value: child.value || '1',
+            mrp: '0',
+            sell_price: '0',
+            available_quantity: child.quantity?.toString() || '0',
+            product_id: child.product_id
+          };
+          
+          const childMrpValue = child.mrp || child.price;
+          const childSellPriceValue = child.sell_price || child.offer || child.mrp || child.price;
+          
+          childPayload.mrp = (childMrpValue !== undefined && childMrpValue !== null && childMrpValue !== '') ? childMrpValue.toString() : '0';
+          childPayload.sell_price = (childSellPriceValue !== undefined && childSellPriceValue !== null && childSellPriceValue !== '') ? childSellPriceValue.toString() : '0';
+          
+          // Process dynamic fields for child
+          currentFields.forEach(field => {
+            const handledFields = ['product_name', 'product_brand', 'uom', 'value', 'available_quantity', 'product_id', 'variant_name', 'quantity'];
+            if (handledFields.includes(field.name)) return;
+            
+            if (field.name === 'mrp') {
+              const mrpFieldValue = child[field.name as keyof BatchRow];
+              if (mrpFieldValue !== undefined && mrpFieldValue !== null && mrpFieldValue !== '') {
+                childPayload.mrp = mrpFieldValue.toString();
+              }
+            } else if (field.name === 'sell_price') {
+              const sellPriceFieldValue = child[field.name as keyof BatchRow];
+              if (sellPriceFieldValue !== undefined && sellPriceFieldValue !== null && sellPriceFieldValue !== '') {
+                childPayload.sell_price = sellPriceFieldValue.toString();
+              }
+            } else if (field.name in child) {
+              const fieldValue = child[field.name as keyof BatchRow];
+              if (fieldValue !== undefined && fieldValue !== null && fieldValue !== '') {
+                childPayload[field.name] = fieldValue.toString();
+              }
+            }
+          });
+          
+          return childPayload;
+        })];
+        
+        bulkPayload = {
+          products: [{
+            title: productInfo.product_name,
+            brand: productInfo.product_brand,
+            category: '',
+            gst_percentage: 0,
+            has_variants: allVariants.length > 1 ? 1 : 0,
+            variants: allVariants
+          }]
+        };
+      } else {
+        // Save single variant only
+        bulkPayload = {
+          products: [{
+            title: productInfo.product_name,
+            brand: productInfo.product_brand,
+            category: '',
+            gst_percentage: 0,
+            has_variants: 0,
+            variants: [payload]
+          }]
+        };
+      }
+      
+      const result = await submitBulkData(bulkPayload);
       
       if (result) {
         if (!skipReload) {
-          setSuccess('Variant added successfully');
+          setSuccess('Item added successfully');
           await loadData();
         }
         return true;
@@ -507,20 +609,49 @@ export default function InventoryDataEntry() {
         const product = products.find(p => p.id.toString() === firstRow.product_id.toString());
         
         const variants = group.map(row => {
+          // Build variant data with proper field mapping for dynamic fields
           const variantData: VariantData = {
             product_name: row.variant_name || row.product_name,
             uom: row.uom || 'Piece',
             value: row.value || '1',
-            mrp: row.price?.toString() || '0',
-            sell_price: row.offer?.toString() || row.price?.toString() || '0',
+            mrp: '0',
+            sell_price: '0',
             available_quantity: row.quantity?.toString() || '0',
             product_id: row.product_id,
           };
           
+          // Handle MRP and sell_price mapping - check both dynamic field names and hardcoded ones
+          const mrpValue = row.mrp || row.price;
+          const sellPriceValue = row.sell_price || row.offer || row.mrp || row.price;
+          
+          variantData.mrp = (mrpValue !== undefined && mrpValue !== null && mrpValue !== '') ? mrpValue.toString() : '0';
+          variantData.sell_price = (sellPriceValue !== undefined && sellPriceValue !== null && sellPriceValue !== '') ? sellPriceValue.toString() : '0';
+          
+          // Process all dynamic fields
           currentFields.forEach(field => {
-            if (field.name in row && 
-                !['product_name', 'product_brand', 'uom', 'value', 'mrp', 'sell_price', 'available_quantity', 'product_id', 'variant_name', 'price', 'offer', 'quantity', 'brand', 'title', 'category', 'gst_percentage'].includes(field.name)) {
-              variantData[field.name] = row[field.name as keyof BatchRow] as string;
+            // Skip fields we've already handled explicitly
+            const handledFields = ['product_name', 'product_brand', 'uom', 'value', 'available_quantity', 'product_id', 'variant_name', 'quantity', 'brand', 'title', 'category', 'gst_percentage'];
+            if (handledFields.includes(field.name)) {
+              return;
+            }
+            
+            // Handle MRP and sell_price fields specifically
+            if (field.name === 'mrp') {
+              const mrpFieldValue = row[field.name as keyof BatchRow];
+              if (mrpFieldValue !== undefined && mrpFieldValue !== null && mrpFieldValue !== '') {
+                variantData.mrp = mrpFieldValue.toString();
+              }
+            } else if (field.name === 'sell_price') {
+              const sellPriceFieldValue = row[field.name as keyof BatchRow];
+              if (sellPriceFieldValue !== undefined && sellPriceFieldValue !== null && sellPriceFieldValue !== '') {
+                variantData.sell_price = sellPriceFieldValue.toString();
+              }
+            } else if (field.name in row) {
+              // Handle all other dynamic fields
+              const fieldValue = row[field.name as keyof BatchRow];
+              if (fieldValue !== undefined && fieldValue !== null && fieldValue !== '') {
+                variantData[field.name] = fieldValue.toString();
+              }
             }
           });
           
@@ -789,7 +920,7 @@ export default function InventoryDataEntry() {
                   <td className="px-3 py-2 text-center sticky right-0 bg-white">
                     <div className="flex items-center justify-center gap-2">
                       <button
-                        onClick={async () => await saveRow(row, false)}
+                        onClick={async () => await saveRow(row, false, undefined, false, true)}
                         disabled={saving === row.id || submitLoading}
                         className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
                         title="Save"
