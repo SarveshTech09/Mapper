@@ -1,0 +1,29 @@
+.gradient-btn {
+  background: linear-gradient(135deg, #DD6B20 0%, #E53E3E 50%, #6B46C1 100%);
+  background-size: 200% 200%;
+  animation: gradientMove 4s ease infinite;
+}
+
+.gradient-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(221, 107, 32, 0.3);
+}
+
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Additional gradient classes for other components */
+.v5-btn {
+  background: linear-gradient(135deg, #DD6B20 0%, #E53E3E 50%, #6B46C1 100%);
+  background-size: 200% 200%;
+  animation: v5gradientMove 4s ease infinite;
+}
+
+@keyframes v5gradientMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

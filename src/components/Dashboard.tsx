@@ -1,11 +1,12 @@
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Package, ClipboardList, Boxes, LogOut, TrendingUp, AlertTriangle, Calendar, Plus, Database, Archive, Keyboard } from 'lucide-react';
 import { useAuth } from '../context/AuthProvider';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import useBrands from '../hooks/useBrands';
 import { useCategories } from '../hooks/useCategories';
 import { useUserData } from '../hooks/useUserData';
 import KeyboardShortcutsDrawer from './KeyboardShortcutsDrawer';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 const NAV_TABS = [
   { path: '/',          label: 'Dashboard View',       icon: ClipboardList },
@@ -32,10 +33,11 @@ const Dashboard = () => {
     { key: 'Ctrl/Cmd + K', description: 'Toggle shortcuts' },
     { key: '?', description: 'Toggle shortcuts' },
     { key: 'Esc', description: 'Close panels/blur focus' },
-    { key: 'D', description: 'Go to Dashboard view' },
-    { key: 'I', description: 'Go to Inventory view' },
-    { key: 'P', description: 'Go to Products view' },
-    { key: 'L', description: 'Logout' },
+    { key: 'Ctrl/Cmd + N', description: 'Add new row/item' },
+    { key: 'Alt + D', description: 'Go to Dashboard view' },
+    { key: 'Alt + I', description: 'Go to Inventory view' },
+    { key: 'Alt + P', description: 'Go to Products view' },
+    { key: 'Alt + L', description: 'Logout' },
   ];
 
   const { logout } = useAuth();
@@ -47,54 +49,11 @@ const Dashboard = () => {
     navigate('/login');
   };
   
-  const handleKeyboardShortcut = useCallback((e: KeyboardEvent) => {
-    // Prevent shortcuts from firing when typing in input fields
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') {
-      return;
-    }
-    
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-      e.preventDefault();
-      setShowShortcuts(prev => !prev);
-    }
-    if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
-      setShowShortcuts(prev => !prev);
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      // Close shortcuts panel if open
-      if (showShortcuts) {
-        setShowShortcuts(false);
-      }
-      // Blur current input focus
-      if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
-      }
-    }
-    if (e.key.toLowerCase() === 'd' && e.altKey) {
-      e.preventDefault();
-      navigate('/');
-    }
-    if (e.key.toLowerCase() === 'i' && e.altKey) {
-      e.preventDefault();
-      navigate('/inventory');
-    }
-    if (e.key.toLowerCase() === 'p' && e.altKey) {
-      e.preventDefault();
-      navigate('/products');
-    }
-    if (e.key.toLowerCase() === 'l' && e.altKey) {
-      e.preventDefault();
-      handleLogout();
-    }
-  }, [showShortcuts, navigate, handleLogout]);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyboardShortcut);
-    return () => window.removeEventListener('keydown', handleKeyboardShortcut);
-  }, [handleKeyboardShortcut]);
+  // Use the keyboard shortcuts hook
+  useKeyboardShortcuts({
+    onToggleShortcuts: setShowShortcuts,
+    showShortcuts
+  });
   
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
