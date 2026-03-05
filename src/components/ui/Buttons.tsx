@@ -20,7 +20,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`p-1.5 rounded transition-colors disabled:opacity-50 ${className}`}
+      className={`p-1.5 rounded-lg transition-all duration-200 disabled:opacity-50 hover:scale-110 ${className}`}
       title={title}
     >
       {icon}
@@ -51,7 +51,7 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
       onClick={onClick}
       disabled={disabled || isSaving || savingId === itemId}
       title={title}
-      className="text-green-600 hover:bg-green-50"
+      className="text-green-600 hover:bg-green-100"
     />
   );
 };
@@ -67,7 +67,7 @@ export const CancelButton: React.FC<CancelButtonProps> = ({ onClick, title = "Ca
       icon={<X className="w-4 h-4" />}
       onClick={onClick}
       title={title}
-      className="text-gray-600 hover:bg-gray-100"
+      className="text-gray-600 hover:bg-gray-200"
     />
   );
 };
@@ -83,7 +83,7 @@ export const DeleteButton: React.FC<DeleteButtonProps> = ({ onClick, title = "De
       icon={<Trash2 className="w-4 h-4" />}
       onClick={onClick}
       title={title}
-      className="text-red-600 hover:bg-red-50"
+      className="text-red-600 hover:bg-red-100"
     />
   );
 };
@@ -99,7 +99,7 @@ export const AddButton: React.FC<AddButtonProps> = ({ onClick, title = "Add" }) 
       icon={<Plus className="w-4 h-4" />}
       onClick={onClick}
       title={title}
-      className="text-blue-600 hover:bg-blue-50"
+      className="text-blue-600 hover:bg-blue-100"
     />
   );
 };

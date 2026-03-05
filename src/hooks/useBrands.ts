@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { useUserData } from './useUserData';
 
-interface BrandParams {
-  // No parameters needed as we'll use user data
-}
+
 
 interface BrandResponse {
   success: boolean;
@@ -16,7 +14,7 @@ interface UseBrandsReturn {
   brandsError: string | null;
   userDataLoading: boolean;
   userDataError: string | null;
-  fetchBrands: (params?: BrandParams) => Promise<void>;
+  fetchBrands: () => Promise<void>;
 }
 
 const useBrands = (): UseBrandsReturn => {
@@ -26,7 +24,7 @@ const useBrands = (): UseBrandsReturn => {
   
   const { userData, loading: userDataLoading, error: userDataError } = useUserData();
 
-  const fetchBrands = async (_params?: BrandParams) => {
+  const fetchBrands = async () => {
     // Wait for user data to load if needed
     if (userDataLoading) {
       setBrandsError('Waiting for user data to load');

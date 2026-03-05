@@ -27,29 +27,69 @@ function App() {
   const { token, logout, loading, initialized } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!token) return;
+ useEffect(() => {
+  if (!token) return;
 
-    const validateToken = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_BASE_URL}/api/me`, {
+  const validateToken = async () => {
+    try {
+
+      const response = await fetch(
+        `${import.meta.env.VITE_BASE_URL}/api/me`,
+        {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
+            Accept: "application/json"
           },
-        });
-
-        if (response.status === 401) {
-          console.warn('App: token rejected by server — logging out');
-          logout();
         }
-      } catch (error) {
-        console.error('App: error validating token:', error);
-      }
-    };
+      );
 
-    validateToken();
-  }, [token, logout]);
+      // ❌ Token invalid
+      if (response.status === 401) {
+        console.warn("Token invalid → logout");
+        logout();
+        return;
+      }
+
+      // ✅ Parse JSON
+      const data = await response.json();
+
+      console.log("USER DATA:", data);
+
+      // ✅ Store business_id
+      if (data.business_id !== undefined) {
+        localStorage.setItem("business_id", data.business_id);
+      }
+
+      // ✅ Store sub_category_id
+      if (data.sub_category_id !== undefined) {
+        localStorage.setItem(
+          "sub_category_id",
+          data.sub_category_id ?? ""
+        );
+      }
+
+         // ✅ Store sub_category_id
+      if (data.tenant_schema !== undefined) {
+        localStorage.setItem(
+          "tenant_schema",
+          data.tenant_schema ?? ""
+        );
+      }
+
+
+      
+
+    } catch (error) {
+
+      console.error("Error validating token:", error);
+
+    }
+  };
+
+  validateToken();
+
+}, [token, logout]);
 
   if (loading || !initialized) return <LoadingScreen />;
 

@@ -59,7 +59,7 @@ export const ParentRow: React.FC<ParentRowProps> = ({
     }));
 
   return (
-    <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : 'hover:bg-gray-50'} transition-colors`}>
+    <tr key={row.id} className={`${row.isNew ? 'bg-blue-50/30 hover:bg-blue-50/50' : 'hover:bg-white/50'} transition-all duration-200`}>
       <td className="px-3 py-2">
         {row.isNew ? (
           <BrandSelect
@@ -72,7 +72,7 @@ export const ParentRow: React.FC<ParentRowProps> = ({
           <select
             value={row.product_brand}
             onChange={(e) => updateRow(row.id, 'product_brand', e.target.value)}
-            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50"
             disabled={!row.isNew}
           >
             <option value="">Select Brand</option>
@@ -97,7 +97,7 @@ export const ParentRow: React.FC<ParentRowProps> = ({
           <select
             value={row.product_id}
             onChange={(e) => updateRow(row.id, 'product_id', e.target.value)}
-            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50"
             disabled={!row.isNew}
           >
             <option value="">Select Product</option>
@@ -164,7 +164,7 @@ export const ParentRow: React.FC<ParentRowProps> = ({
           disabled={!row.isNew}
         />
       </td>
-      <td className="px-3 py-2 text-center sticky right-0 bg-white">
+      <td className="px-3 py-2 text-center sticky right-0 bg-white border-l border-gray-200">
         <div className="flex items-center justify-center gap-2">
           <SaveButton
             onClick={() => saveRow(row, false)}
@@ -216,8 +216,8 @@ export const ChildRow: React.FC<ChildRowProps> = ({
   submitLoading
 }) => {
   return (
-    <tr key={child.id} className="bg-green-50 hover:bg-green-100 transition-colors border-l-4 border-green-400">
-      <td className="px-3 py-2 text-sm text-gray-500 italic" colSpan={2}>
+    <tr key={child.id} className="bg-green-50/30 hover:bg-green-100/50 transition-all duration-200 border-l-4 border-green-400/50">
+      <td className="px-3 py-2 text-sm text-gray-600 font-medium italic bg-green-50/20" colSpan={2}>
         Child Variant
       </td>
       <td className="px-3 py-2">
@@ -281,7 +281,7 @@ export const ChildRow: React.FC<ChildRowProps> = ({
           className="!bg-green-50"
         />
       </td>
-      <td className="px-3 py-2 text-center sticky right-0 bg-green-50">
+      <td className="px-3 py-2 text-center sticky right-0 bg-green-50 border-l border-green-200">
         <div className="flex items-center justify-center gap-2">
           <SaveButton
             onClick={() => saveRow(child, true, parentRowId)}

@@ -154,76 +154,84 @@ export default function EditableGrid() {
 
   return (
     <div className="space-y-4">
+      <style>{`
+        .card-glass {
+          background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.3);
+        }
+      `}</style>
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Inventory Grid View</h2>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 via-red-500 to-purple-600 bg-clip-text text-transparent">Inventory Grid View</h2>
           <p className="text-gray-600 mt-1">View and edit batch inventory data</p>
         </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{error}</span>
+        <div className="flex items-center gap-3 p-4 bg-red-50/50 border border-red-200/50 rounded-xl text-red-700 shadow-sm backdrop-blur-sm">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500" />
+          <span className="font-medium">{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-          <Check className="w-5 h-5 flex-shrink-0" />
-          <span>{success}</span>
+        <div className="flex items-center gap-3 p-4 bg-green-50/50 border border-green-200/50 rounded-xl text-green-700 shadow-sm backdrop-blur-sm">
+          <Check className="w-5 h-5 flex-shrink-0 text-green-500" />
+          <span className="font-medium">{success}</span>
         </div>
       )}
 
-      <div className="overflow-x-auto border border-gray-200 rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto card-glass rounded-2xl shadow-xl border border-white/30 backdrop-blur-sm">
+        <table className="min-w-full divide-y divide-gray-200/50">
+          <thead className="bg-white/50 backdrop-blur-sm border-b border-gray-200/30">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30">
                 Product
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30">
                 Batch Number
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30">
                 Stock Qty
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30">
                 Purchase Rate
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30">
                 MRP
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30">
                 Mfg Date
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30">
                 Expiry Date
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30">
                 Location
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30">
                 Supplier
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-white/30 border-l border-gray-200/30">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white/30 divide-y divide-gray-200/30">
             {batches.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
-                  No inventory data found. Add products and batches to get started.
+                  <div className="text-lg font-medium bg-gradient-to-r from-gray-600 to-gray-700 bg-clip-text text-transparent">No inventory data found</div>
+                  <p className="text-sm text-gray-600 mt-2">Add products and batches to get started.</p>
                 </td>
               </tr>
             ) : (
               batches.map((batch) => {
                 const isEditing = editingId === batch.id;
-
+          
                 return (
-                  <tr key={batch.id} className={`hover:bg-gray-50 ${isEditing ? 'bg-blue-50' : ''}`}>
+                  <tr key={batch.id} className={`hover:bg-white/50 ${isEditing ? 'bg-blue-50/30' : ''} transition-all duration-200`}>
                     <td className="px-4 py-3 text-sm text-gray-900 font-medium">
                       {batch.product_name}
                     </td>
@@ -383,8 +391,8 @@ export default function EditableGrid() {
         </table>
       </div>
 
-      <div className="text-sm text-gray-600">
-        Total Batches: <span className="font-medium">{batches.length}</span>
+      <div className="text-sm text-gray-600 bg-white/30 px-4 py-3 rounded-xl border border-gray-200/30 backdrop-blur-sm">
+        Total Batches: <span className="font-medium text-gray-900 bg-gradient-to-r from-orange-600 to-red-500 bg-clip-text text-transparent">{batches.length}</span>
       </div>
     </div>
   );
