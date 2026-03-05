@@ -9,8 +9,9 @@ import useProductsByBrand from '../hooks/useProductsByBrand';
 import useAddProducts from '../hooks/useAddProducts';
 import { dummyData } from './data';
 import { accountdetails } from '../hooks/use_dynamci';
+import '../styles/gradients.css';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
-// Define the Option type for react-select
 interface OptionType {
   value: string;
   label: string;
@@ -41,14 +42,12 @@ interface ProductRow {
   availableSubCategories?: { value: string; label: string }[];
 }
 
-// Helper function to generate dynamic headers from data.tsx
 interface HeaderConfig {
   key: string;
   label: string;
   className: string;
 }
 
-// Define field type interface
 interface FieldType {
   type: string;
   name: string;
@@ -67,10 +66,7 @@ interface FieldType {
   DataType?: string;
 }
 
-// Helper function to render field based on its type
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, field: keyof ProductRow, value: string | number | boolean | File) => Promise<void>, rowIndex: number, rowProductsMap: Record<string, any[]>, rowLoadingMap: Record<string, boolean>, brandsLoading: boolean, setSuccess: (msg: string | null) => void) => {
-  // Map field names from data.tsx to ProductRow interface
+const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, field: keyof ProductRow, value: string | number | boolean | File) => Promise<void>, rowIndex: number, rowProductsMap: Record<string, any[]>, rowLoadingMap: Record<string, boolean>, brandsLoading: boolean, brands: string[], setSuccess: (msg: string | null) => void) => {
   const fieldMapping: Record<string, keyof ProductRow> = {
     'brand': 'brand_name',
     'title': 'product_name',
@@ -85,13 +81,10 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
   switch (field.type) {
     case 'text':
     case 'textarea':
-      // Special handling for product_name field (title) to show related products
       if (field.name === 'title' && row.brand_name) {
         const rowBrandKey = `${row.id}-${row.brand_name}`;
         const relatedProducts = rowProductsMap[rowBrandKey] || [];
         const isLoading = rowLoadingMap[row.id] || false;
-
-        // Find selected product for proper display
         const selectedProduct = relatedProducts.find((product: string) => product === String(value)) || null;
 
         return (
@@ -202,14 +195,11 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
     case 'autocomplete':
       // Special handling for brand field
       if (field.name === 'brand') {
-        // Extract brand values from field configuration
-        const brandOptions = field.values?.map(opt => {
-          if ('label' in opt) {
-            return { value: opt.value, label: opt.label };
-          } else {
-            return { value: opt.value, label: opt.value };
-          }
-        }) || [];
+        // Use brands fetched from the API instead of field configuration
+        const brandOptions = brands.map(brand => ({
+          value: brand,
+          label: brand
+        }));
         
         return (
           <ReactSelect
@@ -419,8 +409,20 @@ const renderField = (field: FieldType, row: ProductRow, updateRow: (id: string, 
 const generateDynamicHeaders = (fields: FieldType[]): HeaderConfig[] => {
   const headers: HeaderConfig[] = [];
 
-  // First pass: Add all fields except file type
-  fields.forEach((field) => {
+  // Reorder fields to prioritize 'brand' field first
+  const reorderedFields = [...fields];
+  
+  // Find the brand field index
+  const brandFieldIndex = reorderedFields.findIndex(field => field.name === 'brand');
+  
+  // If brand field exists, move it to the beginning
+  if (brandFieldIndex !== -1) {
+    const brandField = reorderedFields.splice(brandFieldIndex, 1)[0];
+    reorderedFields.unshift(brandField);
+  }
+
+  // Process reordered fields
+  reorderedFields.forEach((field) => {
     let label = field.label;
     const key = field.name;
     let className = 'px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider';
@@ -470,23 +472,6 @@ const generateDynamicHeaders = (fields: FieldType[]): HeaderConfig[] => {
 };
 
 export default function ProductDataEntry() {
-  // Add gradient button styles
-  const gradientStyles = `
-    @keyframes gradientMove {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-    .gradient-btn {
-      background: linear-gradient(135deg, #DD6B20 0%, #E53E3E 50%, #6B46C1 100%);
-      background-size: 200% 200%;
-      animation: gradientMove 4s ease infinite;
-    }
-    .gradient-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 25px rgba(221, 107, 32, 0.3);
-    }
-  `;
 
   const [dynamicFields, setDynamicFields] = useState<FieldType[]>([]);
   const [formLoading, setFormLoading] = useState(true);
@@ -612,6 +597,11 @@ export default function ProductDataEntry() {
     };
     setRows([newRow, ...rows]);
   };
+
+  // Use keyboard shortcuts hook after addNewRow is defined
+  useKeyboardShortcuts({
+    onAddNewRow: addNewRow
+  });
 
   const updateRow = async (id: string, field: keyof ProductRow, value: string | number | boolean | File) => {
     if (field === 'category' && businessId) {
@@ -930,7 +920,6 @@ export default function ProductDataEntry() {
 
   return (
     <div className="space-y-4">
-      <style>{gradientStyles}</style>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Product Master Data Entry</h2>
@@ -985,7 +974,6 @@ export default function ProductDataEntry() {
                   {header.label}
                 </th>
               ))}
-              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[120px]">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -1001,12 +989,25 @@ export default function ProductDataEntry() {
             ) : (
               filteredRows.map((row, rowIndex) => (
                 <tr key={row.id} className={`${row.isNew ? 'bg-blue-50' : row.status === 'inactive' ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'} transition-colors`}>
-                  {currentFields
-                    .map((field) => (
+                  {(() => {
+                    // Reorder fields to prioritize 'brand' field first
+                    const reorderedFields = [...currentFields];
+                    
+                    // Find the brand field index
+                    const brandFieldIndex = reorderedFields.findIndex(field => field.name === 'brand');
+                    
+                    // If brand field exists, move it to the beginning
+                    if (brandFieldIndex !== -1) {
+                      const brandField = reorderedFields.splice(brandFieldIndex, 1)[0];
+                      reorderedFields.unshift(brandField);
+                    }
+                    
+                    return reorderedFields.map((field) => (
                       <td key={field.name} className="px-3 py-2">
-                        {renderField(field, row, updateRow, rowIndex, rowProductsMap, rowLoadingMap, brandsLoading, setSuccess)}
+                        {renderField(field, row, updateRow, rowIndex, rowProductsMap, rowLoadingMap, brandsLoading, brands, setSuccess)}
                       </td>
-                    ))}
+                    ));
+                  })()}
                   <td className="px-3 py-2 text-center sticky right-0 bg-white">
                     <div className="flex items-center justify-center gap-2">
                       <button

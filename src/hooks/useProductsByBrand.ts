@@ -77,7 +77,7 @@ const useProductsByBrand = (): UseProductsByBrandReturn => {
         setProducts([]);
         return [];
       }
-    } catch (error) {
+    } catch {
       setProductsError('Error fetching products');
       setProducts([]);
       // Error handling done via setError state

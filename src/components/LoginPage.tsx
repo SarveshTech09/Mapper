@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthProvider';
+import '../styles/gradients.css';
 
 const LoginPage = ({ onLoginSuccess }: { onLoginSuccess?: () => void }) => {
   const { login } = useAuth();
@@ -111,7 +112,6 @@ const LoginPage = ({ onLoginSuccess }: { onLoginSuccess?: () => void }) => {
         .v5-pin-box:focus{border-color:#DD6B20;background:#fff;box-shadow:0 8px 24px rgba(221,107,32,0.1);transform:translateY(-4px)}
         .v5-pin-box.filled{border-color:#6B46C1;background:rgba(107,70,193,0.04)}
         .v5-btn{width:100%;padding:18px;border:none;border-radius:16px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:linear-gradient(135deg,#DD6B20 0%,#E53E3E 50%,#6B46C1 100%);background-size:200% 200%;color:#fff;transition:all 0.4s;animation:v5fieldIn 0.6s ease 0.6s both,v5gradientMove 4s ease infinite;letter-spacing:0.5px;position:relative;overflow:hidden}
-        @keyframes v5gradientMove{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
         .v5-btn:hover{transform:translateY(-3px);box-shadow:0 20px 40px rgba(221,107,32,0.25)}
         .v5-btn:active{transform:translateY(-1px)}
         .v5-btn:disabled{opacity:0.7;pointer-events:none}

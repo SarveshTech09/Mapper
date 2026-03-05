@@ -13,7 +13,7 @@ interface KeyboardShortcutsDrawerProps {
 
 export const DEFAULT_SHORTCUTS = {
   general: [
-    { key: 'Ctrl/Cmd + N', description: 'Add new item' },
+    { key: 'Ctrl/Cmd + N', description: 'Add new row/item' },
     { key: 'Ctrl/Cmd + S', description: 'Save current item' },
     { key: 'Ctrl/Cmd + Enter', description: 'Submit all items' },
     { key: 'Ctrl/Cmd + K', description: 'Toggle shortcuts' },

@@ -27,12 +27,15 @@ export const accountdetails = async (FormName: string) => {
   url.searchParams.append('tenant_schema', tenantSchema || '');
   url.searchParams.append('business_id', businessId.toString());
  
-const parsedSubCategoryId =
-  subCategoryId && subCategoryId !== 'null' ? parseInt(subCategoryId) : null;
- 
-if (parsedSubCategoryId !== null && !isNaN(parsedSubCategoryId)) {
-  url.searchParams.append('sub_category_id', parsedSubCategoryId.toString());
+let parsedSubCategoryId;
+if (subCategoryId && subCategoryId !== 'null') {
+  const parsed = parseInt(subCategoryId);
+  parsedSubCategoryId = isNaN(parsed) ? 0 : parsed;
+} else {
+  parsedSubCategoryId = 0;
 }
+
+url.searchParams.append('sub_category_id', parsedSubCategoryId.toString());
  
  
  
